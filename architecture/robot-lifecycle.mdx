@@ -183,25 +183,23 @@ public void autonomousPeriodic() {
 - `autonomousPeriodic()`: Every 20ms during autonomous (15 seconds in competition)
 
 **Use cases:**
-- Starting the selected autonomous command
+- Starting autonomous commands
 - Resetting sensors (gyro, encoders)
 - Setting subsystems to known states
+- Initiating path replay for autonomous routines
 
-**Typical implementation:**
+<Note>
+The Agrobotics robot currently has empty autonomous init/periodic methods. Autonomous functionality is implemented through the path recording and replay system in the DriveTrain subsystem. To use recorded paths in autonomous mode, you would typically add code here to call `driveTrain.startReplay()`.
+</Note>
+
+**Example autonomous implementation:**
 ```java
 @Override
 public void autonomousInit() {
-  m_autonomousCommand = m_robotContainer.getAutonomousCommand();
-  
-  if (m_autonomousCommand != null) {
-    m_autonomousCommand.schedule();
-  }
+  // Start replaying a recorded path
+  RobotContainer.driveTrain.startReplay();
 }
 ```
-
-<Info>
-The Agrobotics robot currently doesn't schedule autonomous commands here, relying instead on the default commands and manual controls. Path replay functionality in the DriveTrain could be triggered here for autonomous.
-</Info>
 
 ### teleopInit() & teleopPeriodic()
 
