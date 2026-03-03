@@ -1,0 +1,110 @@
+---
+title: 'Teleop Command'
+description: 'API reference for the Teleop command class'
+---
+
+## Overview
+
+The `Teleop` command is the main teleoperated driving command for the robot. It extends `CommandBase` and manages driver input, path recording/replay functionality, and arcade drive control.
+
+**Package:** `frc.robot.commands`
+
+**Requirements:** DriveTrain subsystem
+
+## Constructor
+
+### Teleop()
+
+Creates a new Teleop command instance and registers the DriveTrain subsystem as a requirement.
+
+```java
+public Teleop()
+```
+
+## Command Lifecycle Methods
+
+### initialize()
+
+Called once when the command is initially scheduled. Resets the gyroscope to establish a new heading reference.
+
+```java
+@Override
+public void initialize()
+```
+
+**Actions:**
+- Calls `driveTrain.resetGyro()` to zero the gyroscope heading
+
+### execute()
+
+Called repeatedly (approximately every 20ms) while the command is scheduled. This is the main control loop for teleoperated driving.
+
+```java
+@Override
+public void execute()
+```
+
+**Behavior on each cycle:**
+
+1. **Path Slot Navigation** (only when not recording or replaying)
+   - Left bumper: Switch to previous path slot via `driveTrain.prevPath()`
+   - Right bumper: Switch to next path slot via `driveTrain.nextPath()`
+
+2. **Recording Control** (X button)
+   - Stops replay if currently replaying
+   - Toggles path recording on/off via `driveTrain.toggleRecording()`
+
+3. **Replay Control** (Y/Triangle button)
+   - Stops replay if currently replaying
+   - Starts replay if not recording via `driveTrain.startReplay()`
+
+4. **Drive Control**
+   - **During replay:** Executes `driveTrain.replayStep()` to follow recorded path
+   - **Manual control:** 
+     - Reads left stick Y-axis (inverted) for forward/backward movement
+     - Reads left stick X-axis for turning
+     - Drives using arcade drive: `driveTrain.driveArcade(turn, forward)`
+     - Samples current position for path recording via `driveTrain.samplePath()`
+
+### isFinished()
+
+Determines if the command should end. The Teleop command runs indefinitely during teleoperated period.
+
+```java
+@Override
+public boolean isFinished()
+```
+
+<ParamField path="return" type="boolean">
+  Always returns `false` - command runs until interrupted
+</ParamField>
+
+### end(boolean interrupted)
+
+Called once when the command ends, either by interruption or when `isFinished()` returns true. Stops all motor movement.
+
+```java
+@Override
+public void end(boolean interrupted)
+```
+
+<ParamField path="interrupted" type="boolean">
+  Whether the command was interrupted by another command
+</ParamField>
+
+**Actions:**
+- Calls `driveTrain.driveArcade(0, 0)` to stop all drive motors
+
+## Dependencies
+
+<ParamField path="driveTrain" type="DriveTrain">
+  Static reference to the robot's drive train subsystem from `RobotContainer.driveTrain`
+</ParamField>
+
+<ParamField path="oi" type="OI">
+  Static reference to the operator input interface from `RobotContainer.oi`
+</ParamField>
+
+## Source Reference
+
+`/src/main/java/frc/robot/commands/Teleop.java`

@@ -1,0 +1,155 @@
+---
+title: 'Gamepad Button Mapping'
+description: 'PS4 controller button and axis mappings for robot control'
+---
+
+This page documents the gamepad button and axis mappings used for controlling the robot. The robot uses a PlayStation 4 controller connected via USB.
+
+## Controller Configuration
+
+<ParamField path="USB_PORT" type="int" default="0">
+  USB port number for the gamepad controller connection
+</ParamField>
+
+## Button Mappings
+
+The PS4 controller buttons are mapped to the following integer values:
+
+| Button Name | ID | Constant Name | Physical Button |
+|-------------|-----|---------------|----------------|
+| Square      | 1   | `SQUARE_BUTTON` | Left face button |
+| X           | 2   | `X_BUTTON` | Bottom face button |
+| Circle      | 3   | `CIRCLE_BUTTON` | Right face button |
+| Triangle    | 4   | `TRIANGLE_BUTTON` | Top face button |
+| Left Bumper | 5   | `LEFT_BUMPER` | L1 shoulder button |
+| Right Bumper | 6  | `RIGHT_BUMPER` | R1 shoulder button |
+| Left Trigger | 7  | `LEFT_TRIGGER` | L2 trigger button |
+| Right Trigger | 8 | `RIGHT_TRIGGER` | R2 trigger button |
+| Share       | 9   | `SHARE_BUTTON` | Left center button |
+| Options     | 10  | `OPTIONS_BUTTON` | Right center button |
+| Left Analog Button | 11 | `LEFT_ANALOG_BUTTON` | L3 stick press |
+| Right Analog Button | 12 | `RIGHT_ANALOG_BUTTON` | R3 stick press |
+| PS4 Button  | 13  | `PS4_BUTTON` | PlayStation logo button |
+| Touchpad    | 14  | `TOUCHPAD_BUTTON` | Center touchpad click |
+
+### Button Details
+
+<ParamField path="X_BUTTON" type="int" default="2">
+  Bottom face button (X on PS4)
+</ParamField>
+
+<ParamField path="SQUARE_BUTTON" type="int" default="1">
+  Left face button (Square on PS4)
+</ParamField>
+
+<ParamField path="CIRCLE_BUTTON" type="int" default="3">
+  Right face button (Circle on PS4)
+</ParamField>
+
+<ParamField path="TRIANGLE_BUTTON" type="int" default="4">
+  Top face button (Triangle on PS4)
+</ParamField>
+
+<ParamField path="LEFT_BUMPER" type="int" default="5">
+  L1 shoulder button
+</ParamField>
+
+<ParamField path="RIGHT_BUMPER" type="int" default="6">
+  R1 shoulder button
+</ParamField>
+
+<ParamField path="LEFT_TRIGGER" type="int" default="7">
+  L2 trigger button
+</ParamField>
+
+<ParamField path="RIGHT_TRIGGER" type="int" default="8">
+  R2 trigger button
+</ParamField>
+
+<ParamField path="SHARE_BUTTON" type="int" default="9">
+  Share button (left of touchpad)
+</ParamField>
+
+<ParamField path="OPTIONS_BUTTON" type="int" default="10">
+  Options button (right of touchpad)
+</ParamField>
+
+<ParamField path="LEFT_ANALOG_BUTTON" type="int" default="11">
+  L3 - Press left analog stick
+</ParamField>
+
+<ParamField path="RIGHT_ANALOG_BUTTON" type="int" default="12">
+  R3 - Press right analog stick
+</ParamField>
+
+<ParamField path="PS4_BUTTON" type="int" default="13">
+  PlayStation logo button (center)
+</ParamField>
+
+<ParamField path="TOUCHPAD_BUTTON" type="int" default="14">
+  Press the touchpad as a button
+</ParamField>
+
+## Analog Axis Mappings
+
+The PS4 controller analog sticks provide four axis inputs:
+
+| Axis Name | ID | Constant Name | Control |
+|-----------|-----|---------------|----------|
+| Left Analog X | 0 | `LEFT_ANALOG_X` | Left stick horizontal |
+| Left Analog Y | 1 | `LEFT_ANALOG_Y` | Left stick vertical |
+| Right Analog X | 2 | `RIGHT_ANALOG_X` | Right stick horizontal |
+| Right Analog Y | 5 | `RIGHT_ANALOG_Y` | Right stick vertical |
+
+### Axis Details
+
+<ParamField path="LEFT_ANALOG_X" type="int" default="0">
+  Left analog stick horizontal axis (left/right movement)
+</ParamField>
+
+<ParamField path="LEFT_ANALOG_Y" type="int" default="1">
+  Left analog stick vertical axis (up/down movement)
+</ParamField>
+
+<ParamField path="RIGHT_ANALOG_X" type="int" default="2">
+  Right analog stick horizontal axis (left/right movement)
+</ParamField>
+
+<ParamField path="RIGHT_ANALOG_Y" type="int" default="5">
+  Right analog stick vertical axis (up/down movement)
+</ParamField>
+
+<Note>
+  Axis values range from -1.0 to 1.0, where negative values typically represent left/up and positive values represent right/down.
+</Note>
+
+## Usage in Code
+
+To use these mappings in your code:
+
+```java
+import static frc.robot.gamepad.GamepadConstants.*;
+
+// Create gamepad instance
+Gamepad gamepad = new Gamepad(USB_PORT);
+
+// Read button states
+boolean xPressed = gamepad.getRawButton(X_BUTTON);
+boolean circlePressed = gamepad.getRawButton(CIRCLE_BUTTON);
+
+// Read analog values
+double leftX = gamepad.getRawAxis(LEFT_ANALOG_X);
+double leftY = gamepad.getRawAxis(LEFT_ANALOG_Y);
+```
+
+## Deadzone Handling
+
+The robot applies a deadzone to analog inputs to prevent drift:
+
+<ParamField path="DEADZONE" type="double" default="0.06">
+  Minimum threshold for analog stick input (defined in Constants.java)
+</ParamField>
+
+<Info>
+  Any analog input with an absolute value less than 0.06 is treated as zero to prevent unintended robot movement from stick drift.
+</Info>

@@ -1,0 +1,193 @@
+---
+title: DriveTrain Subsystem
+description: Overview of the DriveTrain subsystem, motor configuration, and drive control modes
+---
+
+## Overview
+
+The `DriveTrain` subsystem controls the robot's movement using a four-motor configuration with TitanQuad motor controllers. It provides arcade and tank drive modes, encoder-based odometry, and path recording/replay capabilities.
+
+<Info>
+The DriveTrain class is located at `src/main/java/frc/robot/subsystems/DriveTrain.java:12`
+</Info>
+
+## Motor Configuration
+
+The drivetrain uses four **TitanQuad** motors in a standard four-wheel configuration:
+
+```java
+private TitanQuad leftBack;
+private TitanQuad leftFront;
+private TitanQuad rightBack;
+private TitanQuad rightFront;
+```
+
+### Initialization
+
+Motors are initialized with the Titan controller ID and individual motor ports from Constants:
+
+```java
+public DriveTrain() { 
+    leftBack = new TitanQuad(Constants.TITAN_ID, Constants.LEFT_BACK);
+    leftFront = new TitanQuad(Constants.TITAN_ID, Constants.LEFT_FRONT);
+    rightBack = new TitanQuad(Constants.TITAN_ID, Constants.RIGHT_BACK);
+    rightFront = new TitanQuad(Constants.TITAN_ID, Constants.RIGHT_FRONT);
+    
+    // Right motors inverted for proper directional control
+    rightBack.setInverted(true);
+    rightFront.setInverted(true);
+}
+```
+
+<Note>
+A 1-second delay (`Timer.delay(1)`) is used after motor initialization to ensure proper hardware setup before encoder configuration.
+</Note>
+
+### Motor Port Configuration
+
+From `Constants.java:6-10`:
+
+```java
+public static final int TITAN_ID = 42;
+public static final int LEFT_FRONT = 0;
+public static final int LEFT_BACK = 1;
+public static final int RIGHT_FRONT = 2;
+public static final int RIGHT_BACK = 3;
+```
+
+## Drive Modes
+
+### Arcade Drive
+
+Arcade drive combines forward/backward and rotation inputs into left and right motor powers:
+
+```java
+public void driveArcade(double x, double y)
+```
+
+**Parameters:**
+- `x` - Rotation input (-1.0 to 1.0)
+- `y` - Forward/backward input (-1.0 to 1.0)
+
+**Implementation** (`DriveTrain.java:77-92`):
+
+```java
+public void driveArcade(double x, double y) {
+    x = Math.max(-1.0, Math.min(1.0, x));
+    y = Math.max(-1.0, Math.min(1.0, y));
+    
+    double left  = y + x;
+    double right = y - x;
+
+    leftBack.set(left);
+    leftFront.set(left);
+    
+    rightBack.set(right);
+    rightFront.set(right);
+
+    lastLeftPower  = left;
+    lastRightPower = right;
+}
+```
+
+<Tip>
+Inputs are automatically clamped to [-1.0, 1.0] range for safety.
+</Tip>
+
+### Tank Drive
+
+Tank drive provides independent control of left and right sides:
+
+```java
+public void driveTank(double left, double right)
+```
+
+**Parameters:**
+- `left` - Left side power (-1.0 to 1.0)
+- `right` - Right side power (-1.0 to 1.0)
+
+**Implementation** (`DriveTrain.java:94-105`):
+
+```java
+public void driveTank(double left, double right) {
+    left  = Math.max(-1.0, Math.min(1.0, left));
+    right = Math.max(-1.0, Math.min(1.0, right));
+
+    leftBack.set(left);
+    leftFront.set(left);
+    rightBack.set(right);
+    rightFront.set(right);
+
+    lastLeftPower  = left;
+    lastRightPower = right;
+}
+```
+
+## Encoder Setup
+
+Each motor has an associated `TitanQuadEncoder` for position tracking. See [Encoders](/subsystems/encoders) for detailed information.
+
+```java
+leftBackEncoder = new TitanQuadEncoder(leftBack, Constants.LEFT_BACK, Constants.DIST_PER_TICK);
+leftFrontEncoder = new TitanQuadEncoder(leftFront, Constants.LEFT_FRONT, Constants.DIST_PER_TICK);
+rightBackEncoder = new TitanQuadEncoder(rightBack, Constants.RIGHT_BACK, Constants.DIST_PER_TICK);
+rightFrontEncoder = new TitanQuadEncoder(rightFront, Constants.RIGHT_FRONT, Constants.DIST_PER_TICK);
+
+leftBackEncoder.setReverseDirection();
+leftFrontEncoder.setReverseDirection();
+```
+
+## Key Methods
+
+### Reset Encoders
+
+```java
+public void resetEncoders()
+```
+
+Resets all four encoders to zero position. Useful at the start of autonomous routines.
+
+### Get Average Distance
+
+```java
+public double getAverageEncoderDistance()
+```
+
+Returns the average distance from all four encoders in millimeters.
+
+### Get Side Distances
+
+```java
+public double getLeftEncoderDistance()
+public double getRightEncoderDistance()
+```
+
+Returns the average encoder distance for left or right side respectively.
+
+## NavX Integration
+
+The subsystem includes a NavX gyroscope for heading tracking:
+
+```java
+public AHRS navX = new AHRS(Constants.NAVX_PORT);
+```
+
+See [NavX Gyroscope](/subsystems/navx) for detailed information.
+
+## Path Recording
+
+The DriveTrain includes path recording and replay functionality through the `PathRecorder` utility:
+
+- `toggleRecording()` - Start/stop recording current driving
+- `startReplay()` - Begin replaying recorded path
+- `replayStep()` - Execute one step of path replay
+- `nextPath()` / `prevPath()` - Switch between multiple recorded paths
+
+<CardGroup cols={2}>
+  <Card title="Encoders" icon="gauge" href="/subsystems/encoders">
+    Learn about encoder configuration and distance tracking
+  </Card>
+  <Card title="NavX Gyroscope" icon="compass" href="/subsystems/navx">
+    Explore gyroscope integration for navigation
+  </Card>
+</CardGroup>

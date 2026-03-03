@@ -1,0 +1,215 @@
+---
+title: Encoders
+description: TitanQuadEncoder usage, distance calculations, and odometry tracking
+---
+
+## Overview
+
+The DriveTrain uses **TitanQuadEncoder** sensors to track wheel rotation and calculate distance traveled. Each of the four motors has an associated encoder for precise position tracking and odometry.
+
+## Encoder Configuration
+
+### Initialization
+
+Encoders are initialized in the DriveTrain constructor (`DriveTrain.java:37-40`):
+
+```java
+leftBackEncoder = new TitanQuadEncoder(leftBack, Constants.LEFT_BACK, Constants.DIST_PER_TICK);
+leftFrontEncoder = new TitanQuadEncoder(leftFront, Constants.LEFT_FRONT, Constants.DIST_PER_TICK);
+rightBackEncoder = new TitanQuadEncoder(rightBack, Constants.RIGHT_BACK, Constants.DIST_PER_TICK);
+rightFrontEncoder = new TitanQuadEncoder(rightFront, Constants.RIGHT_FRONT, Constants.DIST_PER_TICK);
+```
+
+**Parameters:**
+- Motor controller reference (`TitanQuad`)
+- Motor port number
+- Distance per encoder tick (`DIST_PER_TICK`)
+
+### Direction Setup
+
+Left-side encoders are reversed to match the robot's coordinate system:
+
+```java
+leftBackEncoder.setReverseDirection();
+leftFrontEncoder.setReverseDirection();
+```
+
+<Info>
+This ensures positive encoder values when the robot moves forward.
+</Info>
+
+## Distance Calculation Formula
+
+The `DIST_PER_TICK` constant converts encoder pulses to millimeters using wheel geometry.
+
+### Formula Derivation
+
+From `Constants.java:19-23`:
+
+```java
+private static final double wheelRadius = 62.5;  // millimeters
+private static final double pulsePerRevolution = 1464;
+private static final double gearRatio = 1.0;
+private static final double encoderPulseRatio = pulsePerRevolution * gearRatio;
+public static final double DIST_PER_TICK = (Math.PI * 2 * wheelRadius) / encoderPulseRatio;
+```
+
+### Calculation Breakdown
+
+<Steps>
+  <Step title="Calculate wheel circumference">
+    `circumference = π × 2 × radius = π × 2 × 62.5 mm = 392.7 mm`
+  </Step>
+  <Step title="Account for gear ratio">
+    `totalPulses = pulsePerRevolution × gearRatio = 1464 × 1.0 = 1464`
+  </Step>
+  <Step title="Calculate distance per tick">
+    `DIST_PER_TICK = 392.7 / 1464 ≈ 0.268 mm per encoder tick`
+  </Step>
+</Steps>
+
+<Tip>
+The 62.5mm wheel radius and 1464 pulses per revolution are specific to the Studica mecanum wheels and TitanQuad encoders.
+</Tip>
+
+## Odometry Methods
+
+### Individual Encoder Distances
+
+Access each wheel's encoder distance:
+
+```java
+public double leftBackEncoderDistance()
+public double leftFrontEncoderDistance()
+public double rightBackEncoderDistance()
+public double rightFrontEncoderDistance()
+```
+
+**Example** (`DriveTrain.java:61-75`):
+
+```java
+public double leftBackEncoderDistance() {
+    return leftBackEncoder.getEncoderDistance();
+}
+```
+
+**Returns:** Distance in millimeters
+
+### Average Distance
+
+Get the overall average distance from all four wheels:
+
+```java
+public double getAverageEncoderDistance()
+```
+
+**Implementation** (`DriveTrain.java:57-59`):
+
+```java
+public double getAverageEncoderDistance() {
+    return (leftBackEncoder.getEncoderDistance() 
+          + leftFrontEncoder.getEncoderDistance() 
+          + rightBackEncoder.getEncoderDistance() 
+          + rightFrontEncoder.getEncoderDistance()) / 4.0;
+}
+```
+
+<Note>
+Useful for straight-line distance measurement during autonomous routines.
+</Note>
+
+### Side Distances
+
+Get the average distance for left or right side:
+
+```java
+public double getLeftEncoderDistance()
+public double getRightEncoderDistance()
+```
+
+**Implementation** (`DriveTrain.java:107-115`):
+
+```java
+public double getLeftEncoderDistance() {
+    return (leftBackEncoder.getEncoderDistance()
+          + leftFrontEncoder.getEncoderDistance()) / 2.0;
+}
+
+public double getRightEncoderDistance() {
+    return (rightBackEncoder.getEncoderDistance()
+          + rightFrontEncoder.getEncoderDistance()) / 2.0;
+}
+```
+
+**Use Cases:**
+- Differential drive calculations
+- Turn angle estimation
+- Path replay positioning
+
+## Resetting Encoders
+
+Reset all encoders to zero:
+
+```java
+public void resetEncoders()
+```
+
+**Implementation** (`DriveTrain.java:50-55`):
+
+```java
+public void resetEncoders() {
+    leftBackEncoder.reset();
+    leftFrontEncoder.reset();
+    rightBackEncoder.reset();
+    rightFrontEncoder.reset();
+}
+```
+
+<Warning>
+Always reset encoders at the start of autonomous mode to ensure accurate distance tracking.
+</Warning>
+
+## Practical Applications
+
+### Autonomous Driving
+
+```java
+// Drive forward 1000mm
+resetEncoders();
+while (getAverageEncoderDistance() < 1000) {
+    driveArcade(0, 0.5);
+}
+driveTank(0, 0);
+```
+
+### Turn Detection
+
+```java
+// Detect differential between sides (indicates turning)
+double leftDist = getLeftEncoderDistance();
+double rightDist = getRightEncoderDistance();
+double differential = leftDist - rightDist;
+
+if (Math.abs(differential) > 50) {
+    System.out.println("Robot is turning");
+}
+```
+
+### Path Recording
+
+The `PathRecorder` uses encoder distances to replay recorded paths accurately:
+
+```java
+pathRecorder.startReplay(getLeftEncoderDistance(), getRightEncoderDistance());
+```
+
+## Related Topics
+
+<CardGroup cols={2}>
+  <Card title="DriveTrain" icon="gears" href="/subsystems/drivetrain">
+    Back to DriveTrain overview
+  </Card>
+  <Card title="NavX Gyroscope" icon="compass" href="/subsystems/navx">
+    Combine encoders with gyro for advanced odometry
+  </Card>
+</CardGroup>

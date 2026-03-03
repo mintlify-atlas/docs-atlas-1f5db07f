@@ -1,0 +1,339 @@
+---
+title: Detailed Setup Guide
+description: Complete setup instructions for WPILib installation, hardware configuration, and robot deployment
+---
+
+## WPILib Installation
+
+The Agrobotics robot code requires **WPILib 2020.3.2** for compatibility with the GradleRIO plugin.
+
+<Steps>
+  <Step title="Download WPILib">
+    Download the WPILib installer for 2020 from the official FRC documentation:
+    
+    - [Windows Installer](https://github.com/wpilibsuite/allwpilib/releases)
+    - [macOS Installer](https://github.com/wpilibsuite/allwpilib/releases)
+    - [Linux Installer](https://github.com/wpilibsuite/allwpilib/releases)
+    
+    <Warning>
+      This project uses WPILib 2020. Newer versions may have breaking API changes.
+    </Warning>
+  </Step>
+  
+  <Step title="Run the Installer">
+    Execute the installer and select the following options:
+    - **VS Code** (recommended IDE)
+    - **C++ and Java** language support
+    - **FRC Game Tools** (Driver Station, roboRIO Imaging Tool)
+    - **Vendor libraries** (you'll add Studica and NavX later)
+  </Step>
+  
+  <Step title="Install Vendor Dependencies">
+    The project requires two vendor libraries:
+    
+    **Studica TitanQuad Library:**
+    ```json
+    https://dev.studica.com/releases/2020/Studica.json
+    ```
+    
+    **Kauai Labs NavX Library:**
+    ```json
+    https://www.kauailabs.com/dist/frc/2020/navx_frc.json
+    ```
+    
+    In VS Code, press **Ctrl+Shift+P** (Cmd+Shift+P on macOS), type "Manage Vendor Libraries", and install from URLs above.
+  </Step>
+</Steps>
+
+## Project Configuration
+
+### Team Number Setup
+
+Your team number is critical for RoboRIO communication and must be configured in `.wpilib/wpilib_preferences.json`:
+
+```json .wpilib/wpilib_preferences.json
+{
+    "enableCppIntellisense": false,
+    "currentLanguage": "java",
+    "projectYear": "2020",
+    "teamNumber": 1234
+}
+```
+
+The team number is automatically read by the Gradle build script:
+
+```groovy build.gradle
+deploy {
+    targets {
+        vmxpi("roborio") {
+            // Team number loaded from .wpilib/wpilib_preferences.json
+            team = frc.getTeamNumber()
+        }
+    }
+}
+```
+
+### Java Version
+
+This project targets **Java 11**. Verify your Java installation:
+
+```bash
+java -version
+```
+
+You should see output indicating Java 11 or newer:
+
+```
+java version "11.0.x"
+```
+
+## Hardware Requirements
+
+### Motor Controllers
+
+The robot uses **4x Studica TitanQuad** motor controllers configured in a tank drive setup:
+
+- **CAN ID**: 42 (all TitanQuads share this ID)
+- **Motor Channels**:
+  - Channel 0: Left Front
+  - Channel 1: Left Back
+  - Channel 2: Right Front
+  - Channel 3: Right Back
+
+<Note>
+  TitanQuad controllers multiplex up to 4 motors on a single CAN ID. The channels are defined in `Constants.java:7-10`.
+</Note>
+
+### Gyroscope
+
+The **Kauai Labs NavX-MXP** gyroscope provides heading information:
+
+- **Port**: SPI MXP
+- **Purpose**: Gyro reset, autonomous navigation, heading control
+- **Configuration**: `Constants.java:14`
+
+```java Constants.java
+public static final SPI.Port NAVX_PORT = SPI.Port.kMXP;
+```
+
+### Encoders
+
+TitanQuad integrated encoders track wheel position:
+
+- **Resolution**: 1464 pulses per revolution
+- **Wheel Radius**: 62.5mm
+- **Gear Ratio**: 1.0 (direct drive)
+- **Distance Calculation**: `DIST_PER_TICK = (2π × radius) / pulses`
+
+These constants are defined in `Constants.java:19-23`:
+
+```java Constants.java
+private static final double wheelRadius = 62.5;
+private static final double pulsePerRevolution = 1464;
+private static final double gearRatio = 1.0;
+private static final double encoderPulseRatio = pulsePerRevolution * gearRatio;
+public static final double DIST_PER_TICK = (Math.PI * 2 * wheelRadius) / encoderPulseRatio;
+```
+
+### Gamepad Configuration
+
+The robot is designed for an **Xbox-style controller**:
+
+- **Left Stick**: Arcade drive (forward/backward and turning)
+- **X Button**: Toggle path recording
+- **Y Button**: Start/stop path replay
+- **Left Bumper**: Previous path slot
+- **Right Bumper**: Next path slot
+
+<Info>
+  Joystick deadzone is set to 0.06 to prevent drift. Adjust in `Constants.java:12` if needed.
+</Info>
+
+## RoboRIO Setup
+
+### Imaging the RoboRIO
+
+<Steps>
+  <Step title="Open roboRIO Imaging Tool">
+    Launch the tool from the FRC Game Tools installation.
+  </Step>
+  
+  <Step title="Connect via USB">
+    Connect the RoboRIO to your computer using a USB cable.
+  </Step>
+  
+  <Step title="Select Firmware">
+    Choose the **2020.v12** firmware image or the latest compatible with WPILib 2020.
+  </Step>
+  
+  <Step title="Enter Team Number">
+    Input your FRC team number - this configures the hostname as `roborio-XXXX-frc.local`.
+  </Step>
+  
+  <Step title="Format and Image">
+    Click "Format Target" then "Image" to flash the RoboRIO.
+  </Step>
+</Steps>
+
+<Warning>
+  Imaging the RoboRIO will erase all existing code and configuration. Back up any important data first.
+</Warning>
+
+### Network Configuration
+
+The RoboRIO can be accessed via:
+
+1. **USB Connection**: Automatically assigns IP `172.22.11.2`
+2. **WiFi (Robot Radio)**: `10.TE.AM.2` (e.g., team 1234 = `10.12.34.2`)
+3. **Ethernet**: Static IP or DHCP depending on network setup
+4. **mDNS Hostname**: `roborio-XXXX-frc.local` (most reliable)
+
+## Deployment Options
+
+### Standard Deployment
+
+Deploy code to the RoboRIO:
+
+```bash
+./gradlew deploy
+```
+
+This command:
+1. Compiles Java source files
+2. Packages into a JAR with dependencies
+3. Uploads to `/home/lvuser/frcJava_[timestamp].jar`
+4. Restarts the robot program
+
+### Debug Deployment
+
+Enable remote debugging for VS Code:
+
+```bash
+./gradlew deploy -PdebugMode
+```
+
+Then attach the VS Code debugger to port 8348 on the RoboRIO.
+
+### Simulation Mode
+
+Test code without hardware (desktop simulation):
+
+```bash
+./gradlew simulateJava
+```
+
+<Note>
+  Simulation requires desktop support enabled in `build.gradle:41`. Currently set to `false` in this project.
+</Note>
+
+## Gradle Build Configuration
+
+The `build.gradle` file configures all build and deployment settings:
+
+<CodeGroup>
+```groovy Main Configuration
+plugins {
+    id "java"
+    id "com.kauailabs.first.GradleRIO" version "2020.3.2.30"
+}
+
+sourceCompatibility = JavaVersion.VERSION_11
+targetCompatibility = JavaVersion.VERSION_11
+
+def ROBOT_MAIN_CLASS = "frc.robot.Main"
+```
+
+```groovy Deployment Targets
+deploy {
+    targets {
+        vmxpi("roborio") {
+            team = frc.getTeamNumber()
+        }
+    }
+    artifacts {
+        frcJavaArtifact('frcJava') {
+            targets << "roborio"
+            debug = frc.getDebugOrDefault(false)
+        }
+    }
+}
+```
+
+```groovy Dependencies
+dependencies {
+    implementation wpi.deps.wpilib()
+    implementation wpi.deps.vendor.java()
+    testImplementation 'junit:junit:4.12'
+}
+```
+</CodeGroup>
+
+## Constants Reference
+
+All hardware configuration is centralized in `Constants.java`:
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `TITAN_ID` | 42 | CAN ID for all TitanQuad controllers |
+| `LEFT_FRONT` | 0 | Front left motor channel |
+| `LEFT_BACK` | 1 | Rear left motor channel |
+| `RIGHT_FRONT` | 2 | Front right motor channel |
+| `RIGHT_BACK` | 3 | Rear right motor channel |
+| `DEADZONE` | 0.06 | Joystick deadzone threshold |
+| `NAVX_PORT` | `SPI.Port.kMXP` | NavX gyroscope connection |
+| `REPLAY_SPEED` | 0.5 | Autonomous replay speed multiplier |
+| `NUM_PATHS` | 5 | Number of recordable path slots |
+
+See the full constants definition in `src/main/java/frc/robot/Constants.java`.
+
+## Verification
+
+After completing setup, verify everything works:
+
+<Steps>
+  <Step title="Build Test">
+    ```bash
+    ./gradlew build
+    ```
+    Should complete without errors.
+  </Step>
+  
+  <Step title="Deploy Test">
+    ```bash
+    ./gradlew deploy
+    ```
+    Should connect to RoboRIO and upload code.
+  </Step>
+  
+  <Step title="Driver Station Test">
+    - Open FRC Driver Station
+    - Verify "Communications" light is green
+    - Check "Robot Code" light is green
+  </Step>
+  
+  <Step title="Motor Test">
+    - Enable the robot in teleop mode
+    - Test drive controls with gamepad
+    - Verify all four motors respond correctly
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="DriveTrain Deep Dive" icon="car" href="/subsystems/drivetrain">
+    Explore the drivetrain subsystem architecture and encoder integration
+  </Card>
+  
+  <Card title="Path Recording" icon="route" href="/features/path-recording">
+    Learn how to record and replay autonomous paths
+  </Card>
+  
+  <Card title="Command System" icon="terminal" href="/architecture/command-pattern">
+    Understand the command-based programming structure
+  </Card>
+  
+  <Card title="Teleop Controls" icon="gamepad" href="/features/gamepad-controls">
+    Customize driver controls and button mappings
+  </Card>
+</CardGroup>

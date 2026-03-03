@@ -1,0 +1,125 @@
+---
+title: Drive Modes
+description: Understanding arcade and tank drive control modes
+---
+
+The Agrobotics robot supports two distinct drive control modes: **Arcade Drive** and **Tank Drive**. Both modes control the robot's drivetrain using a 4-motor configuration (left front, left back, right front, right back).
+
+## Arcade Drive
+
+Arcade drive uses a single joystick for intuitive control: one axis for forward/backward movement and another for turning.
+
+### How It Works
+
+The `driveArcade()` method combines forward/backward (y) and turning (x) inputs to calculate left and right motor powers:
+
+```java DriveTrain.java:77-92
+public void driveArcade(double x, double y) {
+    x = Math.max(-1.0, Math.min(1.0, x));
+    y = Math.max(-1.0, Math.min(1.0, y));
+    
+    double left  = y + x;
+    double right = y - x;
+
+    leftBack.set(left);
+    leftFront.set(left);
+    
+    rightBack.set(right);
+    rightFront.set(right);
+
+    lastLeftPower  = left;
+    lastRightPower = right;
+}
+```
+
+<Info>
+**Input Clamping**: Both x and y inputs are clamped to the range [-1.0, 1.0] to prevent motor controller errors.
+</Info>
+
+### Power Calculation
+
+The arcade drive algorithm works by:
+
+1. **Forward/Backward**: The `y` value controls forward (+) or backward (-) motion
+2. **Turning**: The `x` value is added to the left side and subtracted from the right side
+3. **Differential Drive**: This creates a speed difference between left and right motors, causing the robot to turn
+
+**Examples:**
+- `driveArcade(0, 0.5)` → Move forward at 50% speed
+- `driveArcade(0.5, 0)` → Turn right in place
+- `driveArcade(0.3, 0.7)` → Move forward while turning right
+
+## Tank Drive
+
+Tank drive provides independent control of left and right motor groups, similar to operating a tank or excavator.
+
+### How It Works
+
+The `driveTank()` method accepts separate power values for left and right sides:
+
+```java DriveTrain.java:94-105
+public void driveTank(double left, double right) {
+    left  = Math.max(-1.0, Math.min(1.0, left));
+    right = Math.max(-1.0, Math.min(1.0, right));
+
+    leftBack.set(left);
+    leftFront.set(left);
+    rightBack.set(right);
+    rightFront.set(right);
+
+    lastLeftPower  = left;
+    lastRightPower = right;
+}
+```
+
+### Control Characteristics
+
+- **Left Stick**: Controls left side motors (front + back)
+- **Right Stick**: Controls right side motors (front + back)
+- **Precision**: Offers more granular control for complex maneuvers
+- **Learning Curve**: Requires more practice than arcade drive
+
+**Examples:**
+- `driveTank(0.5, 0.5)` → Move forward at 50% speed
+- `driveTank(0.5, -0.5)` → Spin clockwise in place
+- `driveTank(0.8, 0.3)` → Arc to the right
+
+## Usage in Teleop
+
+During teleoperation, the robot uses **Arcade Drive** by default:
+
+```java Teleop.java:53-56
+double forward = -oi.getLeftDriveY();
+double turn = oi.getLeftDriveX();
+
+driveTrain.driveArcade(turn, forward);
+```
+
+<Note>
+The `forward` value is negated because joystick Y-axis is inverted (down = positive).
+</Note>
+
+## Path Recording Integration
+
+Both drive modes store their output in `lastLeftPower` and `lastRightPower` variables. These values are used by the [path recording system](/features/path-recording) to capture motor commands during manual driving.
+
+```java DriveTrain.java:129-133
+public void samplePath() {
+    if (pathRecorder.isRecording()) {
+        pathRecorder.sample(lastLeftPower, lastRightPower);
+    }
+}
+```
+
+## Comparison
+
+| Feature | Arcade Drive | Tank Drive |
+|---------|--------------|------------|
+| **Ease of Use** | Beginner-friendly | Requires practice |
+| **Control Method** | Single joystick (X+Y) | Two joysticks or sticks |
+| **Precision** | Good for general driving | Better for tight maneuvers |
+| **Use Case** | Teleop, quick movements | Autonomous replay, fine control |
+
+<Tip>
+Arcade drive is recommended for new drivers, while tank drive is used internally by the autonomous replay system for precise motor control.
+</Tip>

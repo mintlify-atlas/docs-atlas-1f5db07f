@@ -1,0 +1,609 @@
+---
+title: 'Command-Based Programming'
+description: 'Understanding the command pattern using the Teleop command as a practical example'
+---
+
+## What is Command-Based Programming?
+
+Command-based programming is a design pattern provided by WPILib that organizes robot code by separating **what the robot can do** (subsystems) from **what the robot should do** (commands). This separation makes code more modular, testable, and easier to understand.
+
+<Info>
+Think of subsystems as the robot's physical capabilities ("I can drive") and commands as instructions that use those capabilities ("Drive forward when the driver pushes the joystick").
+</Info>
+
+## The Command Pattern
+
+```
+┌─────────────────────────────────────────────┐
+│           CommandScheduler                  │
+│  (manages which commands run when)          │
+└─────────────┬───────────────────────────────┘
+              │ schedules
+              ▼
+┌─────────────────────────────────────────────┐
+│              Command                        │
+│  (defines behavior logic)                   │
+│                                             │
+│  - initialize()  ──┐                        │
+│  - execute()       │ lifecycle methods      │
+│  - end()           │                        │
+│  - isFinished()  ──┘                        │
+└─────────────┬───────────────────────────────┘
+              │ requires
+              ▼
+┌─────────────────────────────────────────────┐
+│            Subsystem                        │
+│  (controls hardware)                        │
+│                                             │
+│  - Hardware objects (motors, sensors)       │
+│  - Control methods (drive, move, etc.)      │
+└─────────────────────────────────────────────┘
+```
+
+## Anatomy of a Command: Teleop
+
+Let's dissect the `Teleop` command to understand how commands work in practice.
+
+**Location:** `src/main/java/frc/robot/commands/Teleop.java`
+
+### Class Declaration
+
+```java Teleop.java:8
+public class Teleop extends CommandBase {
+```
+
+All commands extend `CommandBase`, which provides the command lifecycle methods and integration with the CommandScheduler.
+
+### Subsystem Requirements
+
+```java Teleop.java:10-15
+private static final DriveTrain driveTrain = RobotContainer.driveTrain;
+private static final OI oi = RobotContainer.oi;
+
+public Teleop() {
+    addRequirements(driveTrain);
+}
+```
+
+<Warning>
+**Critical:** `addRequirements(driveTrain)` tells the scheduler that this command needs exclusive access to the DriveTrain. If another command tries to use the DriveTrain while Teleop is running, the scheduler will cancel one of them (based on priority rules).
+</Warning>
+
+**Why this matters:**
+- Prevents multiple commands from fighting over the same subsystem
+- Ensures only one command controls the drive motors at a time
+- Automatically manages command interruption and cancellation
+
+### The Command Lifecycle
+
+Every command has four lifecycle methods that are called by the CommandScheduler:
+
+#### 1. initialize()
+
+```java Teleop.java:18-20
+@Override
+public void initialize() {
+    driveTrain.resetGyro();
+}
+```
+
+**When called:** Once when the command first starts
+
+**Purpose:** Set up initial state, reset sensors, or prepare subsystems
+
+**In Teleop:** Resets the gyroscope to zero heading, giving the driver a consistent starting reference point.
+
+<Note>
+For a default command like Teleop, `initialize()` is called when the robot first enables, and again if the command is ever re-scheduled after being interrupted.
+</Note>
+
+#### 2. execute()
+
+This is where the main command logic lives. It's called every 20ms while the command is scheduled.
+
+```java Teleop.java:23-59
+@Override
+public void execute() {
+
+    // Cycle through path slots with bumpers (only when not recording or replaying)
+    if (!driveTrain.isRecording() && !driveTrain.isReplaying()) {
+        if (oi.getDriveLeftBumper()) {
+            driveTrain.prevPath();
+        }
+        if (oi.getDriveRightBumper()) {
+            driveTrain.nextPath();
+        }
+    }
+
+    if (oi.getDriveXButton()) {
+        if (driveTrain.isReplaying()) {
+            driveTrain.stopReplay();
+        }
+        driveTrain.toggleRecording();
+    }
+
+    if (oi.getDriveYButton()) {
+        if (driveTrain.isReplaying()) {
+            driveTrain.stopReplay();
+        } else if (!driveTrain.isRecording()) {
+            driveTrain.startReplay();
+        }
+    }
+
+    if (driveTrain.isReplaying()) {
+        driveTrain.replayStep();
+    } else {
+        double forward = -oi.getLeftDriveY();
+        double turn = oi.getLeftDriveX();
+
+        driveTrain.driveArcade(turn, forward);
+        driveTrain.samplePath();
+    }
+}
+```
+
+**When called:** Every 20ms (50 times per second) while the command is active
+
+**Purpose:** Implement the command's behavior - read inputs, make decisions, call subsystem methods
+
+**In Teleop:**
+1. **Button handling** - Checks for bumper presses to switch autonomous paths
+2. **Recording control** - X button toggles path recording for autonomous
+3. **Replay control** - Y button starts/stops autonomous path replay
+4. **Driving logic:**
+   - If replaying: Play back recorded autonomous path
+   - If manual: Read joystick and drive with arcade controls
+
+<Info>
+The execute method runs 50 times per second, allowing for responsive control and smooth motion. Each call should complete quickly (under 20ms) to avoid timing issues.
+</Info>
+
+#### 3. end()
+
+```java Teleop.java:67-69
+@Override
+public void end(boolean interrupted) {
+    driveTrain.driveArcade(0, 0);
+}
+```
+
+**When called:** Once when the command finishes or is interrupted
+
+**Purpose:** Clean up, stop motors, return subsystems to safe states
+
+**Parameters:**
+- `interrupted` - `true` if another command interrupted this one, `false` if it finished naturally
+
+**In Teleop:** Stops all drive motors to prevent the robot from continuing to move
+
+<Warning>
+Always implement `end()` to put your subsystems in a safe state. Forgetting this can cause motors to keep running after the command stops, which is dangerous.
+</Warning>
+
+#### 4. isFinished()
+
+```java Teleop.java:62-64
+@Override
+public boolean isFinished() {
+    return false;
+}
+```
+
+**When called:** Every cycle after `execute()` runs
+
+**Purpose:** Tell the scheduler when the command has completed its task
+
+**Return value:**
+- `false` - Command should keep running
+- `true` - Command is done, call `end()` and remove from scheduler
+
+**In Teleop:** Always returns `false` because Teleop is a default command that should run continuously during driver control. It only stops when interrupted or the robot is disabled.
+
+## Command Execution Flow
+
+```
+┌──────────────────────────────────────────────────┐
+│ Command is scheduled (manually or as default)    │
+└────────────────┬─────────────────────────────────┘
+                 ▼
+         ┌───────────────┐
+         │ initialize()  │ ◄─── Called once
+         └───────┬───────┘
+                 ▼
+         ┌───────────────┐
+    ┌───►│   execute()   │ ◄─── Called every 20ms
+    │    └───────┬───────┘
+    │            ▼
+    │    ┌───────────────┐
+    │    │ isFinished()? │
+    │    └───────┬───────┘
+    │            │
+    │     ┌──────┴──────┐
+    │     │             │
+    │    NO            YES
+    │     │             │
+    └─────┘             ▼
+              ┌──────────────────┐
+              │ end(interrupted) │ ◄─── Called once
+              └──────────────────┘
+                       │
+                       ▼
+              Command removed
+              from scheduler
+```
+
+## Default Commands
+
+A subsystem can have a **default command** that runs whenever no other command is using that subsystem.
+
+**Set in:** `RobotContainer.java:17`
+
+```java RobotContainer.java:16-17
+// Set default command for drivetrain
+driveTrain.setDefaultCommand(new Teleop());
+```
+
+**Behavior:**
+- Teleop command automatically starts when the DriveTrain is not being used by another command
+- If another command (like an autonomous driving command) needs the DriveTrain, Teleop is interrupted
+- When that command finishes, Teleop automatically resumes
+
+<Note>
+Default commands are perfect for subsystems that need continuous control, like drivetrains. Without a default command, the DriveTrain would do nothing when no other command is using it.
+</Note>
+
+## Command-Subsystem Interaction
+
+### What Commands Do
+
+```java Teleop.java:53-57
+// Commands orchestrate behavior
+double forward = -oi.getLeftDriveY();
+double turn = oi.getLeftDriveX();
+
+driveTrain.driveArcade(turn, forward);
+driveTrain.samplePath();
+```
+
+Commands:
+- Read sensor data and user input
+- Make decisions based on that data
+- Call subsystem methods to take action
+- Handle timing and sequencing
+
+### What Subsystems Do
+
+```java DriveTrain.java:77-92
+// Subsystems control hardware
+public void driveArcade(double x, double y) {
+    x = Math.max(-1.0, Math.min(1.0, x));
+    y = Math.max(-1.0, Math.min(1.0, y));
+    
+    double left  = y + x;
+    double right = y - x;
+
+    leftBack.set(left);
+    leftFront.set(left);
+    
+    rightBack.set(right);
+    rightFront.set(right);
+
+    lastLeftPower  = left;
+    lastRightPower = right;
+}
+```
+
+Subsystems:
+- Encapsulate hardware (motors, sensors)
+- Provide methods to control that hardware
+- Handle hardware-specific details (inversion, scaling, etc.)
+- Should NOT contain behavior logic
+
+<Info>
+**Rule of thumb:** If you're asking "should this code go in a command or subsystem?"
+- Does it control hardware directly? → Subsystem
+- Does it make decisions about robot behavior? → Command
+</Info>
+
+## Advanced Command Features in Teleop
+
+### State Machine Pattern
+
+Teleop implements a state machine for handling recording and replay:
+
+```java
+if (driveTrain.isReplaying()) {
+    // REPLAY state: play back recorded path
+    driveTrain.replayStep();
+} else {
+    // MANUAL state: driver control
+    double forward = -oi.getLeftDriveY();
+    double turn = oi.getLeftDriveX();
+    
+    driveTrain.driveArcade(turn, forward);
+    driveTrain.samplePath(); // Record if recording is active
+}
+```
+
+**States:**
+1. **Manual driving** - Driver controls robot, optionally recording
+2. **Replay** - Robot plays back recorded autonomous path
+
+**Transitions:**
+- X button: Toggle recording (in manual mode)
+- Y button: Start replay (from manual) or stop replay (return to manual)
+
+### Button Edge Detection
+
+Notice that button presses directly call methods:
+
+```java Teleop.java:35-40
+if (oi.getDriveXButton()) {
+    if (driveTrain.isReplaying()) {
+        driveTrain.stopReplay();
+    }
+    driveTrain.toggleRecording();
+}
+```
+
+<Warning>
+This pattern calls `toggleRecording()` every cycle (50 times per second) while the button is held! This works because `toggleRecording()` handles the toggle logic internally. For better button handling, consider using WPILib's button bindings in RobotContainer.
+</Warning>
+
+**Better approach using button bindings:**
+
+```java
+// In RobotContainer constructor
+oi.getDriveXButton().onTrue(new InstantCommand(() -> driveTrain.toggleRecording()));
+```
+
+This ensures the command runs only once per button press, not continuously.
+
+## Creating Your Own Commands
+
+Here's a template for creating a new command:
+
+```java
+package frc.robot.commands;
+
+import edu.wpi.first.wpilibj2.command.CommandBase;
+import frc.robot.subsystems.MySubsystem;
+
+public class MyCommand extends CommandBase {
+    
+    private final MySubsystem m_subsystem;
+    
+    public MyCommand(MySubsystem subsystem) {
+        m_subsystem = subsystem;
+        addRequirements(subsystem); // Declare subsystem requirement
+    }
+    
+    @Override
+    public void initialize() {
+        // One-time setup when command starts
+    }
+    
+    @Override
+    public void execute() {
+        // Called every 20ms - main command logic
+    }
+    
+    @Override
+    public void end(boolean interrupted) {
+        // Cleanup when command ends
+    }
+    
+    @Override
+    public boolean isFinished() {
+        // Return true when command should stop
+        return false;
+    }
+}
+```
+
+## Command Types
+
+<CardGroup cols={2}>
+  <Card title="Default Commands" icon="repeat">
+    Run continuously on a subsystem until interrupted. Example: Teleop
+  </Card>
+  <Card title="Instant Commands" icon="bolt">
+    Execute immediately and finish. Example: resetting a gyro
+  </Card>
+  <Card title="Timed Commands" icon="clock">
+    Run for a specific duration then stop. Example: run intake for 2 seconds
+  </Card>
+  <Card title="Command Groups" icon="layer-group">
+    Combine multiple commands sequentially or in parallel
+  </Card>
+</CardGroup>
+
+## Command Scheduling
+
+Commands can be scheduled in several ways:
+
+### 1. Default Commands (Automatic)
+
+```java
+driveTrain.setDefaultCommand(new Teleop());
+```
+
+Scheduled automatically when subsystem is free.
+
+### 2. Button Bindings (Recommended)
+
+```java
+// In RobotContainer
+oi.getAButton().whileTrue(new IntakeCommand());
+oi.getBButton().onTrue(new ShootCommand());
+```
+
+Scheduled when button conditions are met.
+
+### 3. Manual Scheduling
+
+```java
+// In autonomousInit()
+m_autonomousCommand.schedule();
+```
+
+Directly schedule a command in code.
+
+### 4. Command Composition
+
+```java
+// Chain commands together
+return new DriveForward()
+    .andThen(new Turn90())
+    .andThen(new DriveBackward());
+```
+
+Create sequences and parallel command groups.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always Declare Requirements">
+    Every command must call `addRequirements()` for any subsystem it uses. This prevents resource conflicts and ensures proper command scheduling.
+    
+    ```java
+    public MyCommand() {
+        addRequirements(m_subsystem);
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Keep execute() Fast">
+    The `execute()` method runs 50 times per second. It should complete quickly (under 20ms) to avoid timing issues. Avoid long loops or blocking operations.
+  </Accordion>
+
+  <Accordion title="Always Implement end()">
+    Stop motors and return subsystems to safe states in `end()`. This prevents dangerous behavior when commands are interrupted.
+    
+    ```java
+    @Override
+    public void end(boolean interrupted) {
+        m_subsystem.stop(); // Always safe shutdown
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Use Button Bindings">
+    Instead of polling buttons in `execute()`, use button bindings in RobotContainer for cleaner, more maintainable code.
+    
+    ```java
+    // Good: button binding
+    button.onTrue(new Command());
+    
+    // Avoid: polling in execute()
+    if (oi.getButton()) { ... }
+    ```
+  </Accordion>
+
+  <Accordion title="Favor Composition Over Inheritance">
+    Use command groups to combine simple commands rather than creating complex inheritance hierarchies.
+    
+    ```java
+    return new DriveToTarget()
+        .andThen(new Shoot())
+        .andThen(new DriveBack());
+    ```
+  </Accordion>
+
+  <Accordion title="Make Commands Reusable">
+    Pass dependencies (subsystems, parameters) through constructors rather than accessing static instances. This makes commands more testable and flexible.
+    
+    ```java
+    // Good
+    public DriveDistance(DriveTrain drive, double distance) { }
+    
+    // Avoid
+    private static final DriveTrain drive = RobotContainer.driveTrain;
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Command Scheduler Details
+
+The CommandScheduler is called in `robotPeriodic()` and performs these steps every 20ms:
+
+```java Robot.java:18-20
+@Override
+public void robotPeriodic() {
+  CommandScheduler.getInstance().run();
+}
+```
+
+**Scheduler execution order:**
+1. Run button bindings to check for newly scheduled commands
+2. For each scheduled command:
+   - If newly scheduled, call `initialize()`
+   - Call `execute()`
+   - Call `isFinished()`
+   - If finished or interrupted, call `end()`
+3. Schedule default commands for free subsystems
+4. Call `periodic()` on all subsystems
+
+<Info>
+This single `CommandScheduler.getInstance().run()` call powers the entire command-based framework. Never remove or conditionally skip this line.
+</Info>
+
+## Real-World Example: Path Recording Flow
+
+Let's trace through what happens when a driver records an autonomous path:
+
+**1. Driver presses X button**
+```java
+oi.getDriveXButton() returns true
+  ↓
+driveTrain.toggleRecording() is called
+  ↓
+PathRecorder starts recording
+```
+
+**2. Driver drives the robot**
+```java
+Every 20ms in execute():
+  ↓
+double forward = -oi.getLeftDriveY();
+double turn = oi.getLeftDriveX();
+  ↓
+driveTrain.driveArcade(turn, forward);
+  ↓
+driveTrain.samplePath(); // Records motor powers
+```
+
+**3. Driver presses X again to stop recording**
+```java
+oi.getDriveXButton() returns true
+  ↓
+driveTrain.toggleRecording() is called
+  ↓
+PathRecorder saves recorded path
+```
+
+**4. Driver presses Y to replay**
+```java
+oi.getDriveYButton() returns true
+  ↓
+driveTrain.startReplay() is called
+  ↓
+Every 20ms in execute():
+  if (driveTrain.isReplaying()) {
+    driveTrain.replayStep(); // Plays back recorded powers
+  }
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="System Architecture" href="/architecture/overview" icon="sitemap">
+    Review how commands fit into the overall architecture
+  </Card>
+  <Card title="Robot Lifecycle" href="/architecture/robot-lifecycle" icon="arrows-rotate">
+    Understand when commands are scheduled during robot lifecycle
+  </Card>
+  <Card title="Subsystems" href="/subsystems/drivetrain" icon="microchip">
+    Learn about the DriveTrain subsystem in detail
+  </Card>
+</CardGroup>

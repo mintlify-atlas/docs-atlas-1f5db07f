@@ -1,0 +1,120 @@
+---
+title: 'GamepadConstants'
+description: 'API reference for gamepad button and axis mappings'
+---
+
+## Overview
+
+The `GamepadConstants` class contains all constant mappings for gamepad buttons and analog axes. These constants are designed for PlayStation 4 controllers but are compatible with most standard gamepads.
+
+**Package:** `frc.robot.gamepad`
+
+## USB Configuration
+
+<ParamField path="USB_PORT" type="int" default="0">
+  USB port number for the drive gamepad on the Driver Station
+</ParamField>
+
+## Button Mappings
+
+Button constants map to the physical buttons on a PlayStation 4 controller.
+
+<ParamField path="X_BUTTON" type="int" default="2">
+  X button (bottom face button on PS4 layout)
+</ParamField>
+
+<ParamField path="SQUARE_BUTTON" type="int" default="1">
+  Square button (left face button on PS4 layout)
+</ParamField>
+
+<ParamField path="CIRCLE_BUTTON" type="int" default="3">
+  Circle button (right face button on PS4 layout)
+</ParamField>
+
+<ParamField path="TRIANGLE_BUTTON" type="int" default="4">
+  Triangle button (top face button on PS4 layout)
+</ParamField>
+
+<ParamField path="LEFT_BUMPER" type="int" default="5">
+  Left bumper (L1)
+</ParamField>
+
+<ParamField path="RIGHT_BUMPER" type="int" default="6">
+  Right bumper (R1)
+</ParamField>
+
+<ParamField path="LEFT_TRIGGER" type="int" default="7">
+  Left trigger (L2) button press
+</ParamField>
+
+<ParamField path="RIGHT_TRIGGER" type="int" default="8">
+  Right trigger (R2) button press
+</ParamField>
+
+<ParamField path="SHARE_BUTTON" type="int" default="9">
+  Share button (left center button on PS4)
+</ParamField>
+
+<ParamField path="OPTIONS_BUTTON" type="int" default="10">
+  Options button (right center button on PS4)
+</ParamField>
+
+<ParamField path="LEFT_ANALOG_BUTTON" type="int" default="11">
+  Left analog stick button (L3 - press down on left stick)
+</ParamField>
+
+<ParamField path="RIGHT_ANALOG_BUTTON" type="int" default="12">
+  Right analog stick button (R3 - press down on right stick)
+</ParamField>
+
+<ParamField path="PS4_BUTTON" type="int" default="13">
+  PlayStation button (center home button)
+</ParamField>
+
+<ParamField path="TOUCHPAD_BUTTON" type="int" default="14">
+  Touchpad button (PS4 touchpad press)
+</ParamField>
+
+## Axis Mappings
+
+Axis constants map to the analog stick channels on a PlayStation 4 controller.
+
+<ParamField path="LEFT_ANALOG_X" type="int" default="0">
+  Left analog stick horizontal axis (left/right movement)
+</ParamField>
+
+<ParamField path="LEFT_ANALOG_Y" type="int" default="1">
+  Left analog stick vertical axis (up/down movement)
+</ParamField>
+
+<ParamField path="RIGHT_ANALOG_X" type="int" default="2">
+  Right analog stick horizontal axis (left/right movement)
+</ParamField>
+
+<ParamField path="RIGHT_ANALOG_Y" type="int" default="5">
+  Right analog stick vertical axis (up/down movement)
+</ParamField>
+
+## Usage Example
+
+```java
+// Create joystick using USB port constant
+Joystick controller = new Joystick(GamepadConstants.USB_PORT);
+
+// Read button state
+boolean xPressed = controller.getRawButton(GamepadConstants.X_BUTTON);
+
+// Read analog axis
+double leftX = controller.getRawAxis(GamepadConstants.LEFT_ANALOG_X);
+```
+
+## Notes
+
+- Button and axis IDs are zero-indexed internally by WPILib
+- Axis values range from -1.0 to 1.0
+- Buttons return true when pressed, false when released
+- For PlayStation controllers, ensure the controller is in DirectInput mode (not XInput)
+
+## Source Reference
+
+`/src/main/java/frc/robot/gamepad/GamepadConstants.java`

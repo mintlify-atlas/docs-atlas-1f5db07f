@@ -1,0 +1,402 @@
+---
+title: 'Robot Lifecycle'
+description: 'Understanding WPILib robot lifecycle methods and when they are called'
+---
+
+## Overview
+
+The WPILib framework manages the robot through a series of lifecycle methods that are called automatically at specific times. Understanding this lifecycle is crucial for knowing where to place initialization code, periodic tasks, and mode-specific logic.
+
+## TimedRobot Base Class
+
+The `Robot` class extends `TimedRobot`, which provides a periodic execution model where methods are called at a fixed rate (default: every 20ms or 50Hz).
+
+**Location:** `src/main/java/frc/robot/Robot.java:7`
+
+```java Robot.java:7
+public class Robot extends TimedRobot {
+```
+
+<Note>
+The 20ms period (50Hz) is the standard FRC control loop frequency. This ensures consistent timing for control algorithms and sensor readings.
+</Note>
+
+## Lifecycle States
+
+The robot can be in one of four states:
+
+<CardGroup cols={2}>
+  <Card title="Disabled" icon="power-off">
+    Robot is powered but not allowed to move. Motors are disabled by the Driver Station.
+  </Card>
+  <Card title="Autonomous" icon="brain">
+    Robot operates independently for 15 seconds at match start. Pre-programmed routines only.
+  </Card>
+  <Card title="Teleop" icon="gamepad">
+    Driver control period. Human operators control the robot using gamepads.
+  </Card>
+  <Card title="Test" icon="flask">
+    Special mode for testing individual subsystems and mechanisms.
+  </Card>
+</CardGroup>
+
+## Lifecycle Method Call Order
+
+### Startup Sequence
+
+```
+1. Robot powers on
+2. robotInit() ───────► Called ONCE when robot code starts
+3. Enter disabled state
+4. disabledInit() ────► Called when entering disabled
+5. disabledPeriodic() ► Called every 20ms while disabled
+```
+
+### Mode Transitions
+
+When the Driver Station enables the robot in a specific mode:
+
+```
+Disabled → Autonomous:
+  1. autonomousInit() ────► Called ONCE when autonomous starts
+  2. autonomousPeriodic() ► Called every 20ms during autonomous
+  
+Autonomous → Teleop:
+  1. teleopInit() ────────► Called ONCE when teleop starts
+  2. teleopPeriodic() ────► Called every 20ms during teleop
+  
+Any Mode → Disabled:
+  1. disabledInit() ──────► Called ONCE when disabled
+  2. disabledPeriodic() ──► Called every 20ms while disabled
+  
+Any Mode → Test:
+  1. testInit() ──────────► Called ONCE when test mode starts
+  2. testPeriodic() ──────► Called every 20ms during test mode
+```
+
+### Special: robotPeriodic()
+
+```
+robotPeriodic() is called every 20ms REGARDLESS of mode
+  ↓
+  ├─→ During disabled: runs alongside disabledPeriodic()
+  ├─→ During autonomous: runs alongside autonomousPeriodic()
+  ├─→ During teleop: runs alongside teleopPeriodic()
+  └─→ During test: runs alongside testPeriodic()
+```
+
+## Lifecycle Methods in Robot.java
+
+### robotInit()
+
+Called once when the robot code first starts. This is where you create the `RobotContainer` and perform one-time initialization.
+
+```java Robot.java:12-15
+@Override
+public void robotInit() {
+  m_robotContainer = new RobotContainer();
+  System.out.println("HIII");
+}
+```
+
+**When called:** 
+- Once at robot startup
+- Before any other lifecycle methods
+- Before any mode is entered
+
+**Use cases:**
+- Creating the RobotContainer
+- One-time initialization that applies to all modes
+- Loading configuration files
+- Initializing NetworkTables or logging
+
+<Warning>
+Avoid long-running operations in `robotInit()` as they delay the robot becoming operational. The method should complete in under 1-2 seconds.
+</Warning>
+
+### robotPeriodic()
+
+Called every 20ms regardless of which mode the robot is in. This is the heart of the command-based framework.
+
+```java Robot.java:18-20
+@Override
+public void robotPeriodic() {
+  CommandScheduler.getInstance().run();
+}
+```
+
+**When called:**
+- Every 20ms (50 times per second)
+- In ALL modes (disabled, autonomous, teleop, test)
+- After the mode-specific periodic method
+
+**Use cases:**
+- Running the CommandScheduler (required for command-based)
+- Updating dashboards and telemetry
+- Sensor polling that needs to happen regardless of mode
+- Vision processing
+
+<Info>
+The `CommandScheduler.getInstance().run()` call is critical - it executes all scheduled commands, manages subsystem requirements, and handles command lifecycle. Without this, commands won't run.
+</Info>
+
+### disabledInit() & disabledPeriodic()
+
+```java Robot.java:23-28
+@Override
+public void disabledInit() {
+}
+
+@Override
+public void disabledPeriodic() {
+}
+```
+
+**When called:**
+- `disabledInit()`: Once when the robot enters disabled state
+- `disabledPeriodic()`: Every 20ms while disabled
+
+**Use cases:**
+- Canceling commands when disabled
+- Resetting subsystem states
+- Autonomous routine selection
+- Pre-match calibration displays
+
+<Note>
+Currently empty in the Agrobotics code, but useful for future enhancements like autonomous routine selection via dashboard.
+</Note>
+
+### autonomousInit() & autonomousPeriodic()
+
+```java Robot.java:31-36
+@Override
+public void autonomousInit() {
+}
+
+@Override
+public void autonomousPeriodic() {
+}
+```
+
+**When called:**
+- `autonomousInit()`: Once at the start of the autonomous period
+- `autonomousPeriodic()`: Every 20ms during autonomous (15 seconds in competition)
+
+**Use cases:**
+- Starting the selected autonomous command
+- Resetting sensors (gyro, encoders)
+- Setting subsystems to known states
+
+**Typical implementation:**
+```java
+@Override
+public void autonomousInit() {
+  m_autonomousCommand = m_robotContainer.getAutonomousCommand();
+  
+  if (m_autonomousCommand != null) {
+    m_autonomousCommand.schedule();
+  }
+}
+```
+
+<Info>
+The Agrobotics robot currently doesn't schedule autonomous commands here, relying instead on the default commands and manual controls. Path replay functionality in the DriveTrain could be triggered here for autonomous.
+</Info>
+
+### teleopInit() & teleopPeriodic()
+
+```java Robot.java:39-44
+@Override
+public void teleopInit() {
+}
+
+@Override
+public void teleopPeriodic() {
+}
+```
+
+**When called:**
+- `teleopInit()`: Once when teleop starts (usually after autonomous)
+- `teleopPeriodic()`: Every 20ms during teleop (2 minutes 15 seconds in competition)
+
+**Use cases:**
+- Canceling autonomous commands
+- Ensuring default commands are running
+- Switching to driver control mode
+
+**Typical implementation:**
+```java
+@Override
+pubic void teleopInit() {
+  // Cancel autonomous command when teleop starts
+  if (m_autonomousCommand != null) {
+    m_autonomousCommand.cancel();
+  }
+}
+```
+
+<Note>
+With command-based programming, most teleop logic lives in the default commands (like `Teleop.java`), so these methods often remain empty or minimal.
+</Note>
+
+### testInit() & testPeriodic()
+
+```java Robot.java:47-53
+@Override
+public void testInit() {
+  CommandScheduler.getInstance().cancelAll();
+}
+
+@Override
+public void testPeriodic() {
+}
+```
+
+**When called:**
+- `testInit()`: Once when test mode is activated
+- `testPeriodic()`: Every 20ms during test mode
+
+**Use cases:**
+- Testing individual mechanisms
+- Motor characterization
+- Sensor calibration
+- Manual subsystem control without commands
+
+<Warning>
+`testInit()` cancels all commands to give you clean control of subsystems for testing. Be aware that default commands won't be running in test mode.
+</Warning>
+
+## Timing Diagram
+
+```
+Time →
+
+0ms    robotInit()
+       ├── Create RobotContainer
+       └── Initialize subsystems
+
+       [Enter Disabled Mode]
+       
+       disabledInit()
+       
+20ms   robotPeriodic() + disabledPeriodic()
+40ms   robotPeriodic() + disabledPeriodic()
+60ms   robotPeriodic() + disabledPeriodic()
+...    (continues every 20ms)
+
+       [Driver Station enables Autonomous]
+       
+       autonomousInit()
+       
+20ms   robotPeriodic() + autonomousPeriodic()
+40ms   robotPeriodic() + autonomousPeriodic()
+...    (continues for 15 seconds)
+
+       [Autonomous ends, Teleop begins]
+       
+       teleopInit()
+       
+20ms   robotPeriodic() + teleopPeriodic()
+40ms   robotPeriodic() + teleopPeriodic()
+...    (continues for 2:15 in competition)
+
+       [Match ends, return to Disabled]
+       
+       disabledInit()
+       
+20ms   robotPeriodic() + disabledPeriodic()
+...    (continues until robot is powered off)
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Keep Init Methods Fast">
+    Init methods should complete quickly (under 100ms ideally). Long-running operations can delay mode transitions and cause Driver Station communication warnings.
+  </Accordion>
+
+  <Accordion title="Use Commands for Complex Logic">
+    With command-based programming, most behavior logic should live in commands, not in periodic methods. This keeps the Robot class clean and makes code more reusable.
+  </Accordion>
+
+  <Accordion title="Always Run CommandScheduler">
+    Never remove or conditionally skip `CommandScheduler.getInstance().run()` in `robotPeriodic()`. The command system depends on this running every cycle.
+  </Accordion>
+
+  <Accordion title="Be Aware of Execution Order">
+    Within a single 20ms cycle, methods execute in this order:
+    1. robotPeriodic()
+    2. Mode-specific periodic (e.g., teleopPeriodic())
+    3. CommandScheduler processes commands
+    4. Subsystem periodic() methods
+  </Accordion>
+
+  <Accordion title="Handle Mode Transitions Gracefully">
+    Use init methods to set subsystems to known safe states when transitioning between modes. This prevents unexpected behavior from previous modes.
+  </Accordion>
+</AccordionGroup>
+
+## Common Patterns
+
+### Pattern 1: Autonomous Command Selection
+
+```java
+private Command m_autonomousCommand;
+
+@Override
+public void autonomousInit() {
+  m_autonomousCommand = m_robotContainer.getAutonomousCommand();
+  
+  if (m_autonomousCommand != null) {
+    m_autonomousCommand.schedule();
+  }
+}
+
+@Override
+public void teleopInit() {
+  // Cancel autonomous when teleop starts
+  if (m_autonomousCommand != null) {
+    m_autonomousCommand.cancel();
+  }
+}
+```
+
+### Pattern 2: Dashboard Updates
+
+```java
+@Override
+public void robotPeriodic() {
+  CommandScheduler.getInstance().run();
+  
+  // Update dashboard with sensor values
+  SmartDashboard.putNumber("Gyro Angle", m_robotContainer.getDriveTrain().getGyroAngle());
+  SmartDashboard.putNumber("Encoder Distance", m_robotContainer.getDriveTrain().getAverageDistance());
+}
+```
+
+### Pattern 3: Mode-Specific Initialization
+
+```java
+@Override
+public void autonomousInit() {
+  // Reset sensors for accurate autonomous navigation
+  m_robotContainer.getDriveTrain().resetEncoders();
+  m_robotContainer.getDriveTrain().resetGyro();
+  
+  m_autonomousCommand = m_robotContainer.getAutonomousCommand();
+  if (m_autonomousCommand != null) {
+    m_autonomousCommand.schedule();
+  }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="System Architecture" href="/architecture/overview" icon="sitemap">
+    Return to the architecture overview
+  </Card>
+  <Card title="Command Pattern" href="/architecture/command-pattern" icon="code">
+    Learn how commands work with the lifecycle
+  </Card>
+</CardGroup>

@@ -1,0 +1,270 @@
+---
+title: NavX Gyroscope
+description: NavX gyroscope integration, yaw reset functionality, and navigation usage
+---
+
+## Overview
+
+The **NavX** is a high-precision gyroscope/IMU (Inertial Measurement Unit) used for tracking the robot's heading and orientation. The DriveTrain subsystem integrates the NavX to provide accurate rotational data for navigation and autonomous routines.
+
+<Info>
+The NavX sensor provides yaw, pitch, and roll data, though the DriveTrain primarily uses yaw (heading) for navigation.
+</Info>
+
+## Hardware Configuration
+
+### Initialization
+
+The NavX is initialized in the DriveTrain constructor using the SPI port:
+
+**From `DriveTrain.java:24`:**
+```java
+public AHRS navX = new AHRS(Constants.NAVX_PORT);
+```
+
+**Port Configuration** (`Constants.java:14`):
+```java
+public static final SPI.Port NAVX_PORT = SPI.Port.kMXP;
+```
+
+<Note>
+`SPI.Port.kMXP` refers to the MXP (Multi-eXpansion Port) on the RoboRIO, which provides high-speed communication with the NavX sensor.
+</Note>
+
+### AHRS Class
+
+The `AHRS` (Attitude and Heading Reference System) class from the NavX library provides:
+
+- **Yaw**: Rotation around vertical axis (Z-axis) - primary heading measurement
+- **Pitch**: Rotation around lateral axis (Y-axis) - tilt forward/backward
+- **Roll**: Rotation around longitudinal axis (X-axis) - tilt left/right
+- **Acceleration**: Linear acceleration in X, Y, Z axes
+- **Angular velocity**: Rate of rotation
+
+## Yaw Reset Functionality
+
+The primary NavX operation in the DriveTrain is resetting the yaw to establish a reference heading.
+
+### Reset Method
+
+```java
+public void resetGyro()
+```
+
+**Implementation** (`DriveTrain.java:169-171`):
+
+```java
+public void resetGyro() {
+    navX.zeroYaw();
+}
+```
+
+### When to Reset Yaw
+
+<CardGroup cols={2}>
+  <Card title="Autonomous Init" icon="flag">
+    Reset at the start of autonomous mode to establish field-relative heading
+  </Card>
+  <Card title="Teleop Init" icon="gamepad">
+    Reset when driver wants to establish forward direction
+  </Card>
+  <Card title="Before Turns" icon="rotate">
+    Reset before executing precise rotation commands
+  </Card>
+  <Card title="After Collisions" icon="circle-exclamation">
+    Reset if the robot has been physically moved or bumped
+  </Card>
+</CardGroup>
+
+<Warning>
+Calling `zeroYaw()` sets the current heading to 0 degrees. Always call this when the robot is stationary and facing the desired reference direction.
+</Warning>
+
+## Navigation Use Cases
+
+### Straight Line Driving
+
+Maintain heading while driving forward:
+
+```java
+// Reset gyro before starting
+resetGyro();
+
+double targetHeading = 0.0;
+double currentHeading = navX.getYaw();
+double error = targetHeading - currentHeading;
+
+// Correct heading with proportional control
+double correction = error * 0.05;  // kP = 0.05
+driveArcade(correction, 0.5);
+```
+
+### Precision Turns
+
+Rotate to a specific angle:
+
+```java
+// Turn 90 degrees right
+resetGyro();
+double targetAngle = -90.0;  // Negative for right turn
+
+while (Math.abs(navX.getYaw() - targetAngle) > 2.0) {
+    double error = targetAngle - navX.getYaw();
+    double power = error * 0.02;  // Proportional control
+    driveArcade(power, 0);
+}
+
+driveTank(0, 0);  // Stop
+```
+
+### Field-Oriented Driving
+
+Drive relative to field coordinates instead of robot orientation:
+
+```java
+double fieldAngle = navX.getYaw();
+double fieldX = joystickX * Math.cos(Math.toRadians(fieldAngle)) 
+              - joystickY * Math.sin(Math.toRadians(fieldAngle));
+double fieldY = joystickX * Math.sin(Math.toRadians(fieldAngle)) 
+              + joystickY * Math.cos(Math.toRadians(fieldAngle));
+
+driveArcade(fieldX, fieldY);
+```
+
+### Gyro-Assisted Autonomous
+
+Combine NavX heading with encoder distances for accurate autonomous navigation:
+
+```java
+// Drive straight for 1000mm
+resetGyro();
+resetEncoders();
+
+while (getAverageEncoderDistance() < 1000) {
+    double headingError = 0.0 - navX.getYaw();
+    double correction = headingError * 0.03;
+    driveArcade(correction, 0.5);
+}
+
+driveTank(0, 0);
+```
+
+## NavX Data Access
+
+Though not explicitly implemented in the DriveTrain, the NavX provides additional useful methods:
+
+### Heading Methods
+
+```java
+navX.getYaw()           // Current yaw angle (-180 to 180 degrees)
+navX.getAngle()         // Continuous angle (no wrapping)
+navX.getCompassHeading() // 0-360 degrees
+```
+
+### Motion Detection
+
+```java
+navX.isMoving()         // Detects any motion
+navX.isRotating()       // Detects rotation
+```
+
+### Calibration Status
+
+```java
+navX.isCalibrating()    // Gyro calibration in progress
+navX.isConnected()      // Sensor connection status
+```
+
+<Tip>
+The NavX automatically calibrates on startup. Avoid moving the robot during the first 3-5 seconds after power-on.
+</Tip>
+
+## Integration with Encoders
+
+Combining NavX heading data with encoder distances enables advanced odometry:
+
+```java
+// Calculate robot position using encoders and heading
+double leftDist = getLeftEncoderDistance();
+double rightDist = getRightEncoderDistance();
+double avgDist = (leftDist + rightDist) / 2.0;
+double heading = Math.toRadians(navX.getYaw());
+
+double deltaX = avgDist * Math.cos(heading);
+double deltaY = avgDist * Math.sin(heading);
+
+System.out.println("Position: X=" + deltaX + ", Y=" + deltaY);
+```
+
+This approach provides more accurate positioning than encoders alone, especially during turns.
+
+## Troubleshooting
+
+### Drift Issues
+
+<AccordionGroup>
+  <Accordion title="Gyro drift over time">
+    NavX gyroscopes can experience small drift over extended operation. Reset the yaw periodically or implement Kalman filtering to compensate.
+  </Accordion>
+  
+  <Accordion title="Calibration errors">
+    If the NavX doesn't calibrate properly, check:
+    - Robot is stationary during boot
+    - SPI connection is secure
+    - NavX firmware is updated
+  </Accordion>
+  
+  <Accordion title="Incorrect heading readings">
+    Verify mounting orientation:
+    - NavX circuit board should be horizontal
+    - Arrow on board points toward robot front
+    - Use `navX.setAngleAdjustment()` if mounting is non-standard
+  </Accordion>
+</AccordionGroup>
+
+### Connection Checks
+
+```java
+if (!navX.isConnected()) {
+    System.out.println("NavX not connected! Check SPI cable.");
+}
+
+if (navX.isCalibrating()) {
+    System.out.println("NavX still calibrating, please wait...");
+}
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Reset at known positions">
+    Always call `resetGyro()` when the robot is at a known heading (e.g., facing forward at match start)
+  </Step>
+  
+  <Step title="Combine with encoders">
+    Use NavX heading with encoder distances for robust odometry
+  </Step>
+  
+  <Step title="Implement PID control">
+    Use PID controllers for smooth, accurate heading correction
+  </Step>
+  
+  <Step title="Monitor connection">
+    Check `isConnected()` periodically to detect sensor failures
+  </Step>
+  
+  <Step title="Allow calibration time">
+    Wait 3-5 seconds after power-on before using gyro data
+  </Step>
+</Steps>
+
+## Related Topics
+
+<CardGroup cols={2}>
+  <Card title="DriveTrain" icon="gears" href="/subsystems/drivetrain">
+    Back to DriveTrain overview
+  </Card>
+  <Card title="Encoders" icon="gauge" href="/subsystems/encoders">
+    Combine NavX with encoder odometry
+  </Card>
+</CardGroup>

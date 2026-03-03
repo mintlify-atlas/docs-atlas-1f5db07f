@@ -1,0 +1,84 @@
+---
+title: 'Motor Port Mapping'
+description: 'Drive motor CAN ID assignments and configuration'
+---
+
+This page details the motor port assignments and configuration for the robot's drive system. The robot uses a four-motor drivetrain with two motors on each side.
+
+## Drive Motor Configuration
+
+The robot uses four drive motors connected via CAN bus. Each motor is assigned a unique CAN ID:
+
+| Motor Position | CAN ID | Constant Name | Location |
+|---------------|--------|---------------|----------|
+| Left Front    | 0      | `LEFT_FRONT`  | Front left wheel |
+| Left Back     | 1      | `LEFT_BACK`   | Rear left wheel |
+| Right Front   | 2      | `RIGHT_FRONT` | Front right wheel |
+| Right Back    | 3      | `RIGHT_BACK`  | Rear right wheel |
+
+## Motor Assignments
+
+<ParamField path="LEFT_FRONT" type="int" default="0">
+  CAN ID for the left front drive motor
+</ParamField>
+
+<ParamField path="LEFT_BACK" type="int" default="1">
+  CAN ID for the left back drive motor
+</ParamField>
+
+<ParamField path="RIGHT_FRONT" type="int" default="2">
+  CAN ID for the right front drive motor
+</ParamField>
+
+<ParamField path="RIGHT_BACK" type="int" default="3">
+  CAN ID for the right back drive motor
+</ParamField>
+
+## Motor Inversion
+
+In the drivetrain implementation, motors are configured with specific inversion settings to ensure proper directional control:
+
+```java
+// Left side motors - normal direction
+leftFront.setInverted(false);
+leftBack.setInverted(false);
+
+// Right side motors - inverted for tank drive
+rightFront.setInverted(true);
+rightBack.setInverted(true);
+```
+
+<Info>
+  The right side motors are inverted because they face the opposite direction from the left side motors. This ensures that positive power values move the robot forward.
+</Info>
+
+## Drivetrain Layout
+
+```
+     FRONT
+┌─────────────┐
+│  [0]   [2]  │  0 = LEFT_FRONT (CAN ID 0)
+│             │  1 = LEFT_BACK (CAN ID 1)
+│             │  2 = RIGHT_FRONT (CAN ID 2, inverted)
+│  [1]   [3]  │  3 = RIGHT_BACK (CAN ID 3, inverted)
+└─────────────┘
+     BACK
+```
+
+## Usage in Code
+
+To reference these motor ports in your code:
+
+```java
+import static frc.robot.Constants.*;
+
+// Create motor controllers
+CANSparkMax leftFront = new CANSparkMax(LEFT_FRONT, MotorType.kBrushless);
+CANSparkMax leftBack = new CANSparkMax(LEFT_BACK, MotorType.kBrushless);
+CANSparkMax rightFront = new CANSparkMax(RIGHT_FRONT, MotorType.kBrushless);
+CANSparkMax rightBack = new CANSparkMax(RIGHT_BACK, MotorType.kBrushless);
+```
+
+<Warning>
+  Ensure CAN IDs are unique across all CAN devices on the robot. Using duplicate IDs will cause communication errors.
+</Warning>

@@ -1,0 +1,291 @@
+---
+title: Gamepad Controls
+description: Button mappings and control scheme for the driver station
+---
+
+The Agrobotics robot uses a single gamepad for all driver controls. This page documents the button mappings and control scheme used during teleop and autonomous testing.
+
+## Control Layout
+
+### Analog Controls
+
+| Control | Function | Implementation |
+|---------|----------|----------------|
+| **Left Analog Stick** | Robot driving | X-axis: turning, Y-axis: forward/backward |
+| **Right Analog Stick** | Not currently used | Reserved for future features |
+
+### Buttons
+
+| Button | Function | Mode Restrictions |
+|--------|----------|-------------------|
+| **X Button** | Toggle path recording on/off | Stops replay if active |
+| **Y Button** | Start/stop autonomous replay | Cannot start while recording |
+| **Left Bumper** | Previous path slot | Only when not recording/replaying |
+| **Right Bumper** | Next path slot | Only when not recording/replaying |
+
+<Info>
+The gamepad uses PlayStation button naming: X (bottom), Y (top triangle), bumpers (L1/R1).
+</Info>
+
+## Driving Controls
+
+### Left Analog Stick
+
+The left analog stick controls the robot using arcade drive:
+
+```java Teleop.java:53-56
+double forward = -oi.getLeftDriveY();
+double turn = oi.getLeftDriveX();
+
+driveTrain.driveArcade(turn, forward);
+```
+
+**Axis Mapping:**
+- **Y-axis (up/down)**: Forward and backward movement
+  - Up (negative) = forward
+  - Down (positive) = backward
+  - Inverted with `-` to match intuitive control
+- **X-axis (left/right)**: Turning
+  - Left (negative) = turn left
+  - Right (positive) = turn right
+
+### Deadzone Filtering
+
+The OI class applies a deadzone to prevent stick drift:
+
+```java OI.java:14-16
+private double applyDeadzone(double value, double deadzone) {
+    return (Math.abs(value) < deadzone) ? 0.0 : value;
+}
+```
+
+Used in analog stick methods:
+
+```java OI.java:26-32
+public double getLeftDriveY() {
+    return -applyDeadzone(drivePad.getRawAxis(GamepadConstants.LEFT_ANALOG_Y), Constants.DEADZONE);
+}
+
+public double getLeftDriveX() {
+    return applyDeadzone(drivePad.getRawAxis(GamepadConstants.LEFT_ANALOG_X), Constants.DEADZONE);
+}
+```
+
+<Note>
+The deadzone threshold is configured in `Constants.DEADZONE`. Values below this threshold are treated as zero.
+</Note>
+
+## Path Recording Controls
+
+### X Button - Toggle Recording
+
+Press X to start or stop recording the current path:
+
+```java Teleop.java:35-40
+if (oi.getDriveXButton()) {
+    if (driveTrain.isReplaying()) {
+        driveTrain.stopReplay();
+    }
+    driveTrain.toggleRecording();
+}
+```
+
+**Behavior:**
+- **First press**: Start recording (clears existing path in current slot)
+- **Second press**: Stop recording and save samples
+- **During replay**: Stops replay first, then toggles recording
+
+### OI Implementation
+
+```java OI.java:50-52
+public boolean getDriveXButton() {
+    return drivePad.getRawButtonPressed(GamepadConstants.X_BUTTON);
+}
+```
+
+<Warning>
+`getRawButtonPressed()` returns true only on the **rising edge** (button press), not while held. This prevents multiple triggers.
+</Warning>
+
+## Autonomous Replay Controls
+
+### Y Button - Start/Stop Replay
+
+Press Y to start replaying the current path, or press again to stop:
+
+```java Teleop.java:42-48
+if (oi.getDriveYButton()) {
+    if (driveTrain.isReplaying()) {
+        driveTrain.stopReplay();
+    } else if (!driveTrain.isRecording()) {
+        driveTrain.startReplay();
+    }
+}
+```
+
+**Behavior:**
+- **During replay**: Stops replay and returns control to driver
+- **Idle (not recording)**: Starts replaying the current path
+- **During recording**: Button is ignored (cannot replay while recording)
+
+### OI Implementation
+
+```java OI.java:54-56
+public boolean getDriveYButton() {
+    return drivePad.getRawButtonPressed(GamepadConstants.TRIANGLE_BUTTON);
+}
+```
+
+<Info>
+The Y button is mapped to `TRIANGLE_BUTTON` constant, following PlayStation controller naming.
+</Info>
+
+## Path Slot Selection
+
+### Bumpers - Cycle Through Slots
+
+Use the left and right bumpers to navigate between the 5 path slots:
+
+```java Teleop.java:26-33
+if (!driveTrain.isRecording() && !driveTrain.isReplaying()) {
+    if (oi.getDriveLeftBumper()) {
+        driveTrain.prevPath();
+    }
+    if (oi.getDriveRightBumper()) {
+        driveTrain.nextPath();
+    }
+}
+```
+
+**Behavior:**
+- **Left Bumper**: Previous path slot (wraps from 1 → 5)
+- **Right Bumper**: Next path slot (wraps from 5 → 1)
+- **Mode Lock**: Only works when **not** recording or replaying
+
+### OI Implementation
+
+```java OI.java:38-48
+public boolean getDriveRightBumper() {
+    return drivePad.getRawButtonPressed(GamepadConstants.RIGHT_BUMPER);
+}
+
+public boolean getDriveLeftBumper() {
+    return drivePad.getRawButtonPressed(GamepadConstants.LEFT_BUMPER);
+}
+```
+
+<Warning>
+Path switching is **disabled** during recording/replay to prevent accidental slot changes mid-operation.
+</Warning>
+
+## Control Flow
+
+The Teleop command's execute loop handles all control inputs:
+
+```java Teleop.java:23-58
+@Override
+public void execute() {
+
+    // Cycle through path slots with bumpers (only when not recording or replaying)
+    if (!driveTrain.isRecording() && !driveTrain.isReplaying()) {
+        if (oi.getDriveLeftBumper()) {
+            driveTrain.prevPath();
+        }
+        if (oi.getDriveRightBumper()) {
+            driveTrain.nextPath();
+        }
+    }
+
+    if (oi.getDriveXButton()) {
+        if (driveTrain.isReplaying()) {
+            driveTrain.stopReplay();
+        }
+        driveTrain.toggleRecording();
+    }
+
+    if (oi.getDriveYButton()) {
+        if (driveTrain.isReplaying()) {
+            driveTrain.stopReplay();
+        } else if (!driveTrain.isRecording()) {
+            driveTrain.startReplay();
+        }
+    }
+
+    if (driveTrain.isReplaying()) {
+        driveTrain.replayStep();
+    } else {
+        double forward = -oi.getLeftDriveY();
+        double turn = oi.getLeftDriveX();
+
+        driveTrain.driveArcade(turn, forward);
+        driveTrain.samplePath();
+    }
+}
+```
+
+## State Machine
+
+The control system has three states:
+
+<Steps>
+  <Step title="Normal Driving">
+    - Left stick controls robot (arcade drive)
+    - Bumpers switch path slots
+    - X button starts recording
+    - Y button starts replay (if path exists)
+  </Step>
+  
+  <Step title="Recording Mode">
+    - Left stick controls robot
+    - Motor commands are sampled every 20ms
+    - Bumpers are disabled
+    - X button stops recording
+    - Y button is ignored
+  </Step>
+  
+  <Step title="Replay Mode">
+    - Left stick is ignored (no manual control)
+    - Recorded commands control the robot
+    - Bumpers are disabled
+    - X button stops replay and toggles to recording
+    - Y button stops replay
+  </Step>
+</Steps>
+
+## GamepadConstants Reference
+
+Button mappings are defined in `GamepadConstants.java`:
+
+```java
+X_BUTTON = 1            // Bottom button (PlayStation X)
+TRIANGLE_BUTTON = 4     // Top button (PlayStation Triangle/Y)
+LEFT_BUMPER = 5         // L1
+RIGHT_BUMPER = 6        // R1
+LEFT_ANALOG_X = 0       // Left stick horizontal
+LEFT_ANALOG_Y = 1       // Left stick vertical
+```
+
+<Tip>
+If using an Xbox controller, the button constants may need adjustment. The current implementation is optimized for PlayStation-style controllers.
+</Tip>
+
+## Quick Reference
+
+```
+╔════════════════════════════════════════════╗
+║         AGROBOTICS GAMEPAD LAYOUT          ║
+╠════════════════════════════════════════════╣
+║                                            ║
+║   [LB]─────────────────────────────[RB]   ║
+║    ↓ Previous Path          Next Path ↓    ║
+║                                            ║
+║            [Y] Start/Stop Replay           ║
+║        [X]                                 ║
+║    Toggle Recording                        ║
+║                                            ║
+║   Left Stick: Drive                        ║
+║   • Y-axis: Forward/Back                   ║
+║   • X-axis: Turn Left/Right                ║
+║                                            ║
+╚════════════════════════════════════════════╝
+```

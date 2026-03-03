@@ -1,0 +1,268 @@
+---
+title: 'OI (Operator Interface)'
+description: 'API reference for the OI class managing gamepad input'
+---
+
+## Overview
+
+The `OI` class (Operator Interface) manages all gamepad input for the robot. It provides a clean interface for reading controller buttons and analog sticks with automatic deadzone application.
+
+**Package:** `frc.robot.gamepad`
+
+## Constructor
+
+### OI()
+
+Creates a new Operator Interface instance and initializes the drive gamepad on the USB port specified in `GamepadConstants.USB_PORT`.
+
+```java
+public OI()
+```
+
+## Analog Stick Methods
+
+All analog methods automatically apply deadzone filtering using `Constants.DEADZONE`.
+
+### getLeftDriveX()
+
+Returns the X-axis value of the left analog stick (horizontal movement).
+
+```java
+public double getLeftDriveX()
+```
+
+<ParamField path="return" type="double">
+  Left stick X-axis value from -1.0 to 1.0 (left to right) with deadzone applied
+</ParamField>
+
+### getLeftDriveY()
+
+Returns the Y-axis value of the left analog stick (vertical movement), inverted.
+
+```java
+public double getLeftDriveY()
+```
+
+<ParamField path="return" type="double">
+  Left stick Y-axis value from -1.0 to 1.0 (up to down) with deadzone applied and inverted
+</ParamField>
+
+**Note:** This method applies an additional negation to invert the axis direction.
+
+### getRightDriveX()
+
+Returns the X-axis value of the right analog stick (horizontal movement).
+
+```java
+public double getRightDriveX()
+```
+
+<ParamField path="return" type="double">
+  Right stick X-axis value from -1.0 to 1.0 (left to right) with deadzone applied
+</ParamField>
+
+### getRightDriveY()
+
+Returns the Y-axis value of the right analog stick (vertical movement).
+
+```java
+public double getRightDriveY()
+```
+
+<ParamField path="return" type="double">
+  Right stick Y-axis value from -1.0 to 1.0 (up to down) with deadzone applied
+</ParamField>
+
+## Button Methods
+
+Most button methods use `getRawButtonPressed()` which only returns true on the initial press, not while held.
+
+### getDriveXButton()
+
+Returns whether the X button was pressed (PlayStation layout).
+
+```java
+public boolean getDriveXButton()
+```
+
+<ParamField path="return" type="boolean">
+  `true` on initial button press, `false` otherwise
+</ParamField>
+
+### getDriveYButton()
+
+Returns whether the Y/Triangle button was pressed.
+
+```java
+public boolean getDriveYButton()
+```
+
+<ParamField path="return" type="boolean">
+  `true` on initial button press, `false` otherwise
+</ParamField>
+
+### getDriveBButton()
+
+Returns whether the B/Circle button was pressed.
+
+```java
+public boolean getDriveBButton()
+```
+
+<ParamField path="return" type="boolean">
+  `true` on initial button press, `false` otherwise
+</ParamField>
+
+### getDriveAButton()
+
+Returns whether the A button was pressed.
+
+```java
+public boolean getDriveAButton()
+```
+
+<ParamField path="return" type="boolean">
+  `true` on initial button press, `false` otherwise
+</ParamField>
+
+**Note:** Currently mapped to the same constant as X button (`GamepadConstants.X_BUTTON`).
+
+### getDriveLeftBumper()
+
+Returns whether the left bumper was pressed.
+
+```java
+public boolean getDriveLeftBumper()
+```
+
+<ParamField path="return" type="boolean">
+  `true` on initial button press, `false` otherwise
+</ParamField>
+
+### getDriveRightBumper()
+
+Returns whether the right bumper was pressed.
+
+```java
+public boolean getDriveRightBumper()
+```
+
+<ParamField path="return" type="boolean">
+  `true` on initial button press, `false` otherwise
+</ParamField>
+
+### getDriveLeftTrigger()
+
+Returns whether the left trigger is currently pressed.
+
+```java
+public boolean getDriveLeftTrigger()
+```
+
+<ParamField path="return" type="boolean">
+  `true` while trigger is held, `false` otherwise
+</ParamField>
+
+**Note:** Uses `getRawButton()` so returns true continuously while held.
+
+### getDriveRightTrigger()
+
+Returns whether the right trigger is currently pressed.
+
+```java
+public boolean getDriveRightTrigger()
+```
+
+<ParamField path="return" type="boolean">
+  `true` while trigger is held, `false` otherwise
+</ParamField>
+
+**Note:** Uses `getRawButton()` so returns true continuously while held.
+
+### getDriveBackButton()
+
+Returns whether the Share button is currently pressed.
+
+```java
+public boolean getDriveBackButton()
+```
+
+<ParamField path="return" type="boolean">
+  `true` while button is held, `false` otherwise
+</ParamField>
+
+### getDriveStartButton()
+
+Returns whether the Options button is currently pressed.
+
+```java
+public boolean getDriveStartButton()
+```
+
+<ParamField path="return" type="boolean">
+  `true` while button is held, `false` otherwise
+</ParamField>
+
+### getDriveLeftAnalogButton()
+
+Returns whether the left analog stick button (L3) is currently pressed.
+
+```java
+public boolean getDriveLeftAnalogButton()
+```
+
+<ParamField path="return" type="boolean">
+  `true` while button is held, `false` otherwise
+</ParamField>
+
+### getDriveRightAnalogButton()
+
+Returns whether the right analog stick button (R3) is currently pressed.
+
+```java
+public boolean getDriveRightAnalogButton()
+```
+
+<ParamField path="return" type="boolean">
+  `true` while button is held, `false` otherwise
+</ParamField>
+
+### getPOV()
+
+Returns the angle of the directional pad (D-pad).
+
+```java
+public int getPOV()
+```
+
+<ParamField path="return" type="int">
+  Angle in degrees (0=up, 90=right, 180=down, 270=left), or -1 if not pressed
+</ParamField>
+
+## Deadzone Logic
+
+### applyDeadzone(double value, double deadzone)
+
+Private helper method that filters small analog stick movements to prevent drift.
+
+```java
+private double applyDeadzone(double value, double deadzone)
+```
+
+<ParamField path="value" type="double">
+  Raw analog input value from -1.0 to 1.0
+</ParamField>
+
+<ParamField path="deadzone" type="double">
+  Threshold below which input is zeroed (typically `Constants.DEADZONE = 0.06`)
+</ParamField>
+
+<ParamField path="return" type="double">
+  Input value if `|value| >= deadzone`, otherwise `0.0`
+</ParamField>
+
+**Logic:** Returns 0.0 if the absolute value is less than the deadzone threshold, otherwise returns the original value unchanged.
+
+## Source Reference
+
+`/src/main/java/frc/robot/gamepad/OI.java`

@@ -1,0 +1,93 @@
+---
+title: Agrobotics FRC Robot Documentation
+description: Complete documentation for the Agrobotics FRC competition robot built with WPILib and command-based programming
+---
+
+## Welcome to Agrobotics FRC Robot
+
+This is the official documentation for the Agrobotics FIRST Robotics Competition (FRC) robot codebase. Built with WPILib 2020 and Java 11, this robot features a sophisticated drivetrain system with path recording and autonomous replay capabilities.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Command-Based Architecture" icon="code">
+    Built on WPILib's command-based framework for modular, maintainable robot code
+  </Card>
+  
+  <Card title="TitanQuad Motor Control" icon="gear">
+    Four-motor mecanum/tank drive system using Studica TitanQuad motor controllers
+  </Card>
+  
+  <Card title="NavX Gyroscope Integration" icon="compass">
+    Precision heading control and navigation with Kauai Labs NavX gyroscope
+  </Card>
+  
+  <Card title="Path Recording & Replay" icon="route">
+    Record and replay autonomous paths with encoder-based distance tracking
+  </Card>
+  
+  <Card title="Dual Drive Modes" icon="gamepad">
+    Supports both arcade and tank drive control schemes for operator preference
+  </Card>
+  
+  <Card title="Multi-Path Storage" icon="database">
+    Store and switch between multiple recorded autonomous paths during competition
+  </Card>
+</CardGroup>
+
+## Quick Links
+
+<CardGroup cols={3}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get your development environment set up and deploy code in minutes
+  </Card>
+  
+  <Card title="Setup Guide" icon="wrench" href="/setup">
+    Detailed setup instructions for WPILib, hardware configuration, and team settings
+  </Card>
+  
+  <Card title="DriveTrain System" icon="car" href="/subsystems/drivetrain">
+    Learn about the drivetrain subsystem, motor control, and encoder integration
+  </Card>
+</CardGroup>
+
+## Project Structure
+
+The robot code is organized following WPILib best practices:
+
+```
+src/main/java/frc/robot/
+├── Robot.java              # Main robot class
+├── RobotContainer.java     # Subsystem and command initialization
+├── Main.java              # Application entry point
+├── Constants.java         # Hardware IDs and configuration constants
+├── subsystems/
+│   └── DriveTrain.java    # Drivetrain subsystem
+├── commands/
+│   └── Teleop.java        # Teleoperated drive command
+└── gamepad/
+    └── OI.java            # Operator interface
+```
+
+## Hardware Overview
+
+- **Motor Controllers**: 4x Studica TitanQuad (ID: 42)
+- **Gyroscope**: Kauai Labs NavX (SPI MXP port)
+- **Encoders**: TitanQuad integrated encoders with distance calculation
+- **Control**: Xbox-style gamepad for driver input
+
+## What's Next?
+
+<Steps>
+  <Step title="Read the Quickstart">
+    Follow the [quickstart guide](/quickstart) to clone the repository and deploy your first build
+  </Step>
+  
+  <Step title="Configure Your Team">
+    Set up your team number and hardware configuration in the [setup guide](/setup)
+  </Step>
+  
+  <Step title="Explore Subsystems">
+    Dive into the [DriveTrain documentation](/subsystems/drivetrain) to understand the robot's capabilities
+  </Step>
+</Steps>

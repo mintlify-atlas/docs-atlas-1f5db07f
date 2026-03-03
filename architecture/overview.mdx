@@ -1,0 +1,255 @@
+---
+title: 'System Architecture'
+description: 'Overview of how the Agrobotics robot code is structured using the WPILib command-based framework'
+---
+
+## Architecture Overview
+
+The Agrobotics robot code follows the WPILib command-based architecture pattern, which separates the robot into distinct layers of responsibility. This design promotes code reusability, testability, and maintainability.
+
+## Core Components
+
+<CardGroup cols={2}>
+  <Card title="Robot" icon="robot">
+    Main entry point that manages the robot lifecycle and runs the command scheduler
+  </Card>
+  <Card title="RobotContainer" icon="box">
+    Organizes subsystems, operator interface, and default commands
+  </Card>
+  <Card title="Subsystems" icon="microchip">
+    Control hardware and provide methods for robot capabilities (e.g., DriveTrain)
+  </Card>
+  <Card title="Commands" icon="terminal">
+    Define robot behaviors by calling subsystem methods (e.g., Teleop)
+  </Card>
+</CardGroup>
+
+## Class Relationships
+
+```
+┌─────────────────────────────────────────────┐
+│              Robot.java                     │
+│  (extends TimedRobot)                       │
+│                                             │
+│  - robotInit()                              │
+│  - robotPeriodic()                          │
+│  - teleopInit()                             │
+│  - autonomousInit()                         │
+└──────────────┬──────────────────────────────┘
+               │ creates
+               ▼
+┌─────────────────────────────────────────────┐
+│         RobotContainer.java                 │
+│                                             │
+│  - driveTrain: DriveTrain                   │
+│  - oi: OI                                   │
+│  - Sets default commands                    │
+└──────────────┬──────────────────────────────┘
+               │ initializes
+               ▼
+   ┌───────────────────────┐
+   │                       │
+   ▼                       ▼
+┌──────────────┐    ┌──────────────┐
+│  DriveTrain  │◄───│   Teleop     │
+│ (Subsystem)  │    │  (Command)   │
+│              │    │              │
+│ - driveArcade()   │ - execute()  │
+│ - resetGyro()     │ - initialize()│
+│ - encoders        │ - end()      │
+│ - motors          │              │
+└──────────────┘    └──────────────┘
+       ▲
+       │ requires
+       └────────────────┘
+```
+
+## Robot.java
+
+The `Robot` class serves as the main entry point for the robot program.
+
+**Key responsibilities:**
+- Extends `TimedRobot` from WPILib
+- Creates the `RobotContainer` instance during initialization
+- Runs the `CommandScheduler` every robot cycle (every 20ms)
+- Manages lifecycle transitions (disabled, teleop, autonomous, test)
+
+**Location:** `src/main/java/frc/robot/Robot.java`
+
+```java Robot.java:12-15
+@Override
+public void robotInit() {
+  m_robotContainer = new RobotContainer();
+  System.out.println("HIII");
+}
+```
+
+```java Robot.java:18-20
+@Override
+public void robotPeriodic() {
+  CommandScheduler.getInstance().run();
+}
+```
+
+## RobotContainer.java
+
+The `RobotContainer` class organizes all robot subsystems and commands.
+
+**Key responsibilities:**
+- Instantiates all subsystems (DriveTrain, etc.)
+- Creates the operator interface (OI) for controller input
+- Sets default commands for subsystems
+- Configures button bindings (not shown in current implementation)
+
+**Location:** `src/main/java/frc/robot/RobotContainer.java`
+
+```java RobotContainer.java:12-18
+public RobotContainer() {
+  driveTrain = new DriveTrain();
+  oi = new OI();
+  
+  // Set default command for drivetrain
+  driveTrain.setDefaultCommand(new Teleop());
+}
+```
+
+<Note>
+The default command runs continuously whenever no other command is using the subsystem. In this case, `Teleop` is the default command for the drivetrain, meaning it runs during teleop mode unless interrupted.
+</Note>
+
+## Subsystems
+
+Subsystems represent physical robot mechanisms and encapsulate hardware control.
+
+### DriveTrain Subsystem
+
+**Location:** `src/main/java/frc/robot/subsystems/DriveTrain.java`
+
+The `DriveTrain` subsystem controls the robot's movement using four motors in a tank drive configuration.
+
+**Hardware managed:**
+- 4 TitanQuad motor controllers (left/right, front/back)
+- 4 encoders for position tracking
+- NavX gyroscope for heading
+- PathRecorder for autonomous path recording/replay
+
+**Key methods:**
+- `driveArcade(x, y)` - Arcade drive control
+- `driveTank(left, right)` - Tank drive control
+- `resetGyro()` - Zero the gyroscope heading
+- `toggleRecording()` - Start/stop path recording
+- `startReplay()` - Begin autonomous path replay
+
+```java DriveTrain.java:77-92
+public void driveArcade(double x, double y) {
+    x = Math.max(-1.0, Math.min(1.0, x));
+    y = Math.max(-1.0, Math.min(1.0, y));
+    
+    double left  = y + x;
+    double right = y - x;
+
+    leftBack.set(left);
+    leftFront.set(left);
+    
+    rightBack.set(right);
+    rightFront.set(right);
+
+    lastLeftPower  = left;
+    lastRightPower = right;
+}
+```
+
+## Commands
+
+Commands define robot behaviors by orchestrating subsystem methods.
+
+### Teleop Command
+
+**Location:** `src/main/java/frc/robot/commands/Teleop.java`
+
+The `Teleop` command handles driver control during teleoperated mode.
+
+**Dependencies:**
+- Requires the `DriveTrain` subsystem
+- Reads input from the `OI` (operator interface)
+
+**Lifecycle:**
+1. `initialize()` - Resets gyro when command starts
+2. `execute()` - Runs continuously, reads joystick input and drives motors
+3. `end()` - Stops motors when command is interrupted
+4. `isFinished()` - Returns false (runs indefinitely as default command)
+
+```java Teleop.java:13-15
+public Teleop() {
+    addRequirements(driveTrain);
+}
+```
+
+<Warning>
+The `addRequirements()` call is critical - it tells the command scheduler that this command needs exclusive access to the DriveTrain. No other command can use the DriveTrain while Teleop is running.
+</Warning>
+
+## Command Scheduler
+
+The `CommandScheduler` is the WPILib framework component that manages command execution.
+
+**Responsibilities:**
+- Runs all scheduled commands each cycle
+- Handles command lifecycle (initialize, execute, end)
+- Manages subsystem requirements and prevents conflicts
+- Cancels interrupted commands
+
+**Location in code:** Called in `Robot.java:19`
+
+```java
+CommandScheduler.getInstance().run();
+```
+
+This single line, executed every 20ms in `robotPeriodic()`, drives the entire command-based system.
+
+## Data Flow
+
+```
+Controller Input → OI → Teleop Command → DriveTrain Subsystem → Motors
+                   │           │               │
+                   │           │               └─→ Encoders (feedback)
+                   │           │
+                   │           └─→ PathRecorder (recording)
+                   │
+                   └─→ Button mappings
+```
+
+## Key Design Principles
+
+<AccordionGroup>
+  <Accordion title="Separation of Concerns">
+    Each component has a single, well-defined responsibility:
+    - **Robot**: Lifecycle management
+    - **RobotContainer**: Object composition and configuration
+    - **Subsystems**: Hardware control
+    - **Commands**: Behavior logic
+  </Accordion>
+
+  <Accordion title="Subsystem Requirements">
+    Commands declare which subsystems they need using `addRequirements()`. The scheduler ensures only one command can control a subsystem at a time, preventing conflicts.
+  </Accordion>
+
+  <Accordion title="Default Commands">
+    Subsystems can have a default command that runs when no other command is using that subsystem. The Teleop command is the DriveTrain's default command.
+  </Accordion>
+
+  <Accordion title="Static Subsystem Access">
+    Subsystems are stored as static fields in RobotContainer, allowing commands to easily access them. This is a common pattern in FRC robot code.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Robot Lifecycle" href="/architecture/robot-lifecycle" icon="arrows-rotate">
+    Learn about WPILib lifecycle methods and when they're called
+  </Card>
+  <Card title="Command Pattern" href="/architecture/command-pattern" icon="code">
+    Deep dive into command-based programming with the Teleop example
+  </Card>
+</CardGroup>

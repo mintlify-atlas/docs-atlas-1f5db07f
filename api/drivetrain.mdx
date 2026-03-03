@@ -1,0 +1,296 @@
+---
+title: "DriveTrain"
+description: "API reference for the DriveTrain subsystem class"
+---
+
+The `DriveTrain` class manages the robot's four-wheel drive system, including motor control, encoder readings, gyroscope integration, and path recording/replay functionality.
+
+## Package
+
+```java
+frc.robot.subsystems.DriveTrain
+```
+
+## Extends
+
+`edu.wpi.first.wpilibj2.command.SubsystemBase`
+
+## Constructor
+
+### DriveTrain()
+
+Initializes the DriveTrain subsystem with four Titan Quad motors, encoders, and a NavX gyroscope.
+
+```java
+public DriveTrain()
+```
+
+## Drive Methods
+
+### driveArcade
+
+Controls the robot using arcade drive (single joystick control).
+
+```java
+public void driveArcade(double x, double y)
+```
+
+<ParamField path="x" type="double">
+  The rotation rate (turn) value, clamped between -1.0 and 1.0
+</ParamField>
+
+<ParamField path="y" type="double">
+  The forward/backward speed value, clamped between -1.0 and 1.0
+</ParamField>
+
+**Behavior:** Calculates left and right motor powers using arcade drive algorithm: `left = y + x`, `right = y - x`.
+
+### driveTank
+
+Controls the robot using tank drive (separate control for left and right sides).
+
+```java
+public void driveTank(double left, double right)
+```
+
+<ParamField path="left" type="double">
+  The power for left side motors, clamped between -1.0 and 1.0
+</ParamField>
+
+<ParamField path="right" type="double">
+  The power for right side motors, clamped between -1.0 and 1.0
+</ParamField>
+
+**Behavior:** Sets left and right motors directly to the specified power values.
+
+## Encoder Methods
+
+### resetEncoders
+
+Resets all four encoder values to zero.
+
+```java
+public void resetEncoders()
+```
+
+### getAverageEncoderDistance
+
+Calculates the average distance traveled across all four encoders.
+
+```java
+public double getAverageEncoderDistance()
+```
+
+<ResponseField name="return" type="double">
+  The average distance in configured units (typically inches or centimeters)
+</ResponseField>
+
+### getLeftEncoderDistance
+
+Gets the average distance from the left side encoders.
+
+```java
+public double getLeftEncoderDistance()
+```
+
+<ResponseField name="return" type="double">
+  Average of left front and left back encoder distances
+</ResponseField>
+
+### getRightEncoderDistance
+
+Gets the average distance from the right side encoders.
+
+```java
+public double getRightEncoderDistance()
+```
+
+<ResponseField name="return" type="double">
+  Average of right front and right back encoder distances
+</ResponseField>
+
+### leftBackEncoderDistance
+
+Returns the distance traveled by the left back wheel.
+
+```java
+public double leftBackEncoderDistance()
+```
+
+<ResponseField name="return" type="double">
+  Distance from left back encoder
+</ResponseField>
+
+### leftFrontEncoderDistance
+
+Returns the distance traveled by the left front wheel.
+
+```java
+public double leftFrontEncoderDistance()
+```
+
+<ResponseField name="return" type="double">
+  Distance from left front encoder
+</ResponseField>
+
+### rightBackEncoderDistance
+
+Returns the distance traveled by the right back wheel.
+
+```java
+public double rightBackEncoderDistance()
+```
+
+<ResponseField name="return" type="double">
+  Distance from right back encoder
+</ResponseField>
+
+### rightFrontEncoderDistance
+
+Returns the distance traveled by the right front wheel.
+
+```java
+public double rightFrontEncoderDistance()
+```
+
+<ResponseField name="return" type="double">
+  Distance from right front encoder
+</ResponseField>
+
+## Gyroscope Methods
+
+### resetGyro
+
+Resets the NavX gyroscope yaw to zero.
+
+```java
+public void resetGyro()
+```
+
+## Path Recording Methods
+
+### toggleRecording
+
+Toggles path recording on or off. If recording is active, stops it and saves the path. If not recording, starts a new recording session.
+
+```java
+public boolean toggleRecording()
+```
+
+<ResponseField name="return" type="boolean">
+  `true` if recording was started, `false` if recording was stopped
+</ResponseField>
+
+**Console Output:** Prints recording status and sample count to system output.
+
+### samplePath
+
+Records the current motor powers as a sample point. Should be called periodically (every 20ms) during recording.
+
+```java
+public void samplePath()
+```
+
+**Behavior:** Only records if recording is currently active. Captures `lastLeftPower` and `lastRightPower`.
+
+### isRecording
+
+Checks if path recording is currently active.
+
+```java
+public boolean isRecording()
+```
+
+<ResponseField name="return" type="boolean">
+  `true` if recording is active, `false` otherwise
+</ResponseField>
+
+## Path Replay Methods
+
+### startReplay
+
+Starts replaying the currently recorded path.
+
+```java
+public void startReplay()
+```
+
+**Behavior:** Validates that a path has been recorded before starting replay. Initializes replay with current encoder positions for stall detection. Prints status to console.
+
+### stopReplay
+
+Stops the current path replay and halts the robot.
+
+```java
+public void stopReplay()
+```
+
+**Behavior:** Stops replay mode and sets all motors to zero.
+
+### replayStep
+
+Executes one step of the path replay. Should be called periodically (every 20ms) during replay.
+
+```java
+public boolean replayStep()
+```
+
+<ResponseField name="return" type="boolean">
+  `true` if replay is continuing, `false` if replay has finished or stalled
+</ResponseField>
+
+**Behavior:** Retrieves next motor power values from PathRecorder and applies them. Stops motors and returns false when replay completes.
+
+### isReplaying
+
+Checks if path replay is currently active.
+
+```java
+public boolean isReplaying()
+```
+
+<ResponseField name="return" type="boolean">
+  `true` if replay is active, `false` otherwise
+</ResponseField>
+
+## Path Slot Management
+
+### nextPath
+
+Switches to the next path slot (cycles through available slots).
+
+```java
+public void nextPath()
+```
+
+**Console Output:** Prints the new current path number and total number of paths.
+
+### prevPath
+
+Switches to the previous path slot (cycles through available slots).
+
+```java
+public void prevPath()
+```
+
+**Console Output:** Prints the new current path number and total number of paths.
+
+### getCurrentPathIndex
+
+Returns the current path slot index.
+
+```java
+public int getCurrentPathIndex()
+```
+
+<ResponseField name="return" type="int">
+  Zero-based index of the current path slot
+</ResponseField>
+
+## Fields
+
+- `navX` (AHRS) - Public NavX gyroscope instance for direct access to orientation data
+- `leftBack`, `leftFront`, `rightBack`, `rightFront` (TitanQuad) - Motor controllers
+- `leftBackEncoder`, `leftFrontEncoder`, `rightBackEncoder`, `rightFrontEncoder` (TitanQuadEncoder) - Wheel encoders
+- `pathRecorder` (PathRecorder) - Internal path recording/replay manager
+- `lastLeftPower`, `lastRightPower` (double) - Last commanded motor powers for recording

@@ -1,0 +1,118 @@
+---
+title: 'Constants'
+description: 'API reference for robot-wide configuration constants'
+---
+
+## Overview
+
+The `Constants` class contains all robot-wide configuration values including motor IDs, sensor ports, mechanical specifications, and tuning parameters.
+
+**Package:** `frc.robot`
+
+## Motor Controller IDs
+
+CAN IDs for motor controllers on the robot.
+
+<ParamField path="TITAN_ID" type="int" default="42">
+  CAN ID for the Titan motor controller
+</ParamField>
+
+<ParamField path="LEFT_FRONT" type="int" default="0">
+  CAN ID for the left front drive motor
+</ParamField>
+
+<ParamField path="LEFT_BACK" type="int" default="1">
+  CAN ID for the left back drive motor
+</ParamField>
+
+<ParamField path="RIGHT_FRONT" type="int" default="2">
+  CAN ID for the right front drive motor
+</ParamField>
+
+<ParamField path="RIGHT_BACK" type="int" default="3">
+  CAN ID for the right back drive motor
+</ParamField>
+
+## Input Configuration
+
+<ParamField path="DEADZONE" type="double" default="0.06">
+  Deadzone threshold for gamepad analog sticks. Input values with absolute value below this threshold are treated as zero to prevent controller drift.
+</ParamField>
+
+## Sensor Configuration
+
+<ParamField path="NAVX_PORT" type="SPI.Port" default="SPI.Port.kMXP">
+  SPI port for the NavX gyroscope/IMU sensor. Uses the MXP (Multi-eXpansion Port) on the RoboRIO.
+</ParamField>
+
+## Path Recording/Replay
+
+<ParamField path="REPLAY_SPEED" type="double" default="0.5">
+  Speed multiplier for path replay (0.0 to 1.0). A value of 0.5 means paths are replayed at 50% of recorded speed for safety and accuracy.
+</ParamField>
+
+<ParamField path="NUM_PATHS" type="int" default="5">
+  Maximum number of path slots available for recording and storage. Paths are indexed from 0 to 4.
+</ParamField>
+
+<ParamField path="STALL_CHECK_CYCLES" type="int" default="25">
+  Number of consecutive cycles to check for motor stall conditions before triggering a stall response.
+</ParamField>
+
+## Encoder Calculations
+
+These constants and calculations are used to convert encoder pulses to distance measurements.
+
+<ParamField path="wheelRadius" type="double" default="62.5">
+  Radius of the drive wheels in millimeters
+</ParamField>
+
+<ParamField path="pulsePerRevolution" type="double" default="1464">
+  Number of encoder pulses per complete wheel revolution
+</ParamField>
+
+<ParamField path="gearRatio" type="double" default="1.0">
+  Gear ratio between the motor and wheel (1.0 means direct drive)
+</ParamField>
+
+<ParamField path="encoderPulseRatio" type="double" default="1464.0">
+  Calculated as `pulsePerRevolution * gearRatio`. Total pulses per wheel revolution accounting for gearing.
+</ParamField>
+
+<ParamField path="DIST_PER_TICK" type="double" default="~0.268mm">
+  Distance traveled per encoder tick in millimeters. Calculated as:
+  
+  ```java
+  (Math.PI * 2 * wheelRadius) / encoderPulseRatio
+  ```
+  
+  Formula: `(2π × 62.5) / 1464 ≈ 0.268mm`
+  
+  This converts raw encoder counts to real-world distance measurements.
+</ParamField>
+
+## Usage Example
+
+```java
+// Access motor IDs
+TalonFX leftFront = new TalonFX(Constants.LEFT_FRONT);
+
+// Use deadzone for input filtering
+if (Math.abs(joystickValue) > Constants.DEADZONE) {
+    drive(joystickValue);
+}
+
+// Convert encoder ticks to distance
+double distanceMM = encoderTicks * Constants.DIST_PER_TICK;
+```
+
+## Notes
+
+- All distance calculations assume wheel radius is accurate and wheels are not slipping
+- Motor IDs must match the CAN IDs configured on the physical motor controllers
+- The NavX sensor must be properly connected to the MXP port on the RoboRIO
+- Path slots are 0-indexed (0 through 4 for `NUM_PATHS = 5`)
+
+## Source Reference
+
+`/src/main/java/frc/robot/Constants.java`

@@ -1,0 +1,205 @@
+---
+title: Path Recording
+description: Recording robot movements for autonomous replay
+---
+
+The path recording system captures the robot's motor commands during manual driving, allowing those movements to be replayed autonomously later. This is useful for creating repeatable autonomous routines without complex path planning.
+
+## Overview
+
+Path recording works by sampling motor power values every 20ms (one robot cycle) while the driver manually controls the robot. These samples are stored in memory and can be replayed during autonomous mode.
+
+<Info>
+The system supports **5 independent path slots**, allowing you to record and switch between multiple autonomous routines.
+</Info>
+
+## Recording a Path
+
+### Toggle Recording
+
+Press the **X button** on the gamepad to start/stop recording:
+
+```java Teleop.java:35-40
+if (oi.getDriveXButton()) {
+    if (driveTrain.isReplaying()) {
+        driveTrain.stopReplay();
+    }
+    driveTrain.toggleRecording();
+}
+```
+
+The `toggleRecording()` method in DriveTrain:
+
+```java DriveTrain.java:117-127
+public boolean toggleRecording() {
+    if (pathRecorder.isRecording()) {
+        pathRecorder.stopRecording();
+        System.out.println("[PathRecorder] Stopped recording path " 
+            + (pathRecorder.getCurrentPathIndex() + 1) 
+            + " - " + pathRecorder.getSampleCount() + " samples saved.");
+        return false;
+    } else {
+        pathRecorder.startRecording();
+        System.out.println("[PathRecorder] Recording started on path " 
+            + (pathRecorder.getCurrentPathIndex() + 1) + ".");
+        return true;
+    }
+}
+```
+
+<Warning>
+When you start a new recording, the current path slot is **cleared**. Any previously recorded data in that slot is overwritten.
+</Warning>
+
+### Sampling Process
+
+While recording, the system captures motor powers every cycle:
+
+```java Teleop.java:57
+driveTrain.samplePath();
+```
+
+This calls the `samplePath()` method:
+
+```java DriveTrain.java:129-133
+public void samplePath() {
+    if (pathRecorder.isRecording()) {
+        pathRecorder.sample(lastLeftPower, lastRightPower);
+    }
+}
+```
+
+The `sample()` method in PathRecorder stores the data:
+
+```java PathRecorder.java:80-83
+public void sample(double leftPower, double rightPower) {
+    if (!recording) return;
+    currentSamples().add(new Sample(leftPower, rightPower));
+}
+```
+
+## Data Structure
+
+Each recorded sample stores left and right motor powers:
+
+```java PathRecorder.java:13-21
+public static class Sample {
+    public final double leftPower;
+    public final double rightPower;
+
+    public Sample(double leftPower, double rightPower) {
+        this.leftPower  = leftPower;
+        this.rightPower = rightPower;
+    }
+}
+```
+
+### Multi-Path Storage
+
+The PathRecorder maintains 5 independent path slots:
+
+```java PathRecorder.java:24-26
+private final List<List<Sample>> paths = new ArrayList<>();
+private int currentPathIndex = 0;
+```
+
+Initialization creates all 5 slots:
+
+```java PathRecorder.java:38-42
+public PathRecorder() {
+    for (int i = 0; i < Constants.NUM_PATHS; i++) {
+        paths.add(new ArrayList<>());
+    }
+}
+```
+
+<Note>
+The number of path slots is configurable via `Constants.NUM_PATHS` (default: 5).
+</Note>
+
+## Path Slot Management
+
+### Switching Between Paths
+
+Use the **left and right bumpers** to cycle through path slots:
+
+```java Teleop.java:26-33
+if (!driveTrain.isRecording() && !driveTrain.isReplaying()) {
+    if (oi.getDriveLeftBumper()) {
+        driveTrain.prevPath();
+    }
+    if (oi.getDriveRightBumper()) {
+        driveTrain.nextPath();
+    }
+}
+```
+
+<Warning>
+You can only switch paths when **not recording or replaying**. This prevents accidentally changing slots mid-operation.
+</Warning>
+
+### Path Navigation
+
+The next/previous methods cycle through slots:
+
+```java PathRecorder.java:50-57
+public void nextPath() {
+    currentPathIndex = (currentPathIndex + 1) % Constants.NUM_PATHS;
+}
+
+public void prevPath() {
+    currentPathIndex = (currentPathIndex - 1 + Constants.NUM_PATHS) % Constants.NUM_PATHS;
+}
+```
+
+The modulo arithmetic ensures the index wraps around (e.g., slot 5 → slot 1, slot 1 → slot 5).
+
+## Recording Workflow
+
+<Steps>
+  <Step title="Select a path slot">
+    Use **left/right bumpers** to choose one of the 5 slots (1-5)
+  </Step>
+  
+  <Step title="Start recording">
+    Press **X button** to begin recording. The console will show:
+    ```
+    [PathRecorder] Recording started on path 2.
+    ```
+  </Step>
+  
+  <Step title="Drive the robot">
+    Manually control the robot using arcade drive. Motor commands are sampled every 20ms.
+  </Step>
+  
+  <Step title="Stop recording">
+    Press **X button** again to stop. The console will show:
+    ```
+    [PathRecorder] Stopped recording path 2 - 437 samples saved.
+    ```
+  </Step>
+  
+  <Step title="Replay (optional)">
+    Press **Y button** to replay the recorded path. See [Autonomous Replay](/features/autonomous-replay) for details.
+  </Step>
+</Steps>
+
+## Sample Count
+
+The number of samples corresponds to recording duration:
+
+- **50 samples** = 1 second (50 cycles × 20ms)
+- **250 samples** = 5 seconds
+- **500 samples** = 10 seconds
+
+You can query the sample count:
+
+```java PathRecorder.java:151-153
+public int getSampleCount() {
+    return currentSamples().size();
+}
+```
+
+## Integration with Replay
+
+Recorded paths can be replayed autonomously. The replay system reads samples sequentially and applies them to the drivetrain in real-time. See [Autonomous Replay](/features/autonomous-replay) for details on how recorded paths are executed.

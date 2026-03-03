@@ -1,0 +1,278 @@
+---
+title: "PathRecorder"
+description: "API reference for the PathRecorder utility class"
+---
+
+The `PathRecorder` class manages recording and replaying autonomous paths for FRC robots. It supports multiple path slots, stall detection during replay, and real-time path playback.
+
+## Package
+
+```java
+frc.robot.utils.PathRecorder
+```
+
+## Constructor
+
+### PathRecorder()
+
+Initializes the PathRecorder with multiple path storage slots.
+
+```java
+public PathRecorder()
+```
+
+**Behavior:** Creates `Constants.NUM_PATHS` empty path slots for storing recorded paths.
+
+## Inner Classes
+
+### Sample
+
+Represents one recorded sample containing motor powers at a single 20ms cycle.
+
+```java
+public static class Sample
+```
+
+#### Fields
+
+<ParamField path="leftPower" type="double">
+  The power value for the left side motors (-1.0 to 1.0)
+</ParamField>
+
+<ParamField path="rightPower" type="double">
+  The power value for the right side motors (-1.0 to 1.0)
+</ParamField>
+
+#### Constructor
+
+```java
+public Sample(double leftPower, double rightPower)
+```
+
+<ParamField path="leftPower" type="double">
+  Left motor power value
+</ParamField>
+
+<ParamField path="rightPower" type="double">
+  Right motor power value
+</ParamField>
+
+## Recording Methods
+
+### startRecording
+
+Starts recording a new path in the current slot. Clears any existing path data in that slot.
+
+```java
+public void startRecording()
+```
+
+**Behavior:** Clears the current path slot's samples and enables recording mode.
+
+### stopRecording
+
+Stops the current recording session.
+
+```java
+public void stopRecording()
+```
+
+### isRecording
+
+Checks if recording is currently active.
+
+```java
+public boolean isRecording()
+```
+
+<ResponseField name="return" type="boolean">
+  `true` if recording is active, `false` otherwise
+</ResponseField>
+
+### sample
+
+Records one cycle's motor powers. Should be called every 20ms while recording.
+
+```java
+public void sample(double leftPower, double rightPower)
+```
+
+<ParamField path="leftPower" type="double">
+  The current left side motor power
+</ParamField>
+
+<ParamField path="rightPower" type="double">
+  The current right side motor power
+</ParamField>
+
+**Behavior:** Only records if recording is active. Adds a new Sample to the current path.
+
+## Replay Methods
+
+### startReplay
+
+Starts replaying the recorded path in the current slot.
+
+```java
+public void startReplay(double currentLeft, double currentRight)
+```
+
+<ParamField path="currentLeft" type="double">
+  Current left encoder distance for stall detection initialization
+</ParamField>
+
+<ParamField path="currentRight" type="double">
+  Current right encoder distance for stall detection initialization
+</ParamField>
+
+**Behavior:** Does nothing if the current path slot is empty. Initializes replay state and stall detection.
+
+### stopReplay
+
+Stops the current replay session.
+
+```java
+public void stopReplay()
+```
+
+### isReplaying
+
+Checks if replay is currently active.
+
+```java
+public boolean isReplaying()
+```
+
+<ResponseField name="return" type="boolean">
+  `true` if replay is active, `false` otherwise
+</ResponseField>
+
+### replayStep
+
+Returns the next sample's motor powers during replay. Should be called once per 20ms cycle.
+
+```java
+public double[] replayStep(double currentLeft, double currentRight)
+```
+
+<ParamField path="currentLeft" type="double">
+  Current left encoder distance for stall detection
+</ParamField>
+
+<ParamField path="currentRight" type="double">
+  Current right encoder distance for stall detection
+</ParamField>
+
+<ResponseField name="return" type="double[]">
+  Array containing `[leftPower, rightPower]` for the next step, or `null` if replay is finished or stalled
+</ResponseField>
+
+**Behavior:** 
+- Returns `null` if replay is complete or not active
+- Performs stall detection and returns `null` if robot is stuck
+- Automatically advances to next sample
+- Prints stall detection message to console if detected
+
+### hasRecordedPath
+
+Checks if the current path slot contains recorded data.
+
+```java
+public boolean hasRecordedPath()
+```
+
+<ResponseField name="return" type="boolean">
+  `true` if current path has samples, `false` if empty
+</ResponseField>
+
+## Path Slot Management
+
+### nextPath
+
+Cycles to the next path slot (wraps around to slot 0 after the last slot).
+
+```java
+public void nextPath()
+```
+
+**Behavior:** Uses modulo arithmetic to cycle through `Constants.NUM_PATHS` slots.
+
+### prevPath
+
+Cycles to the previous path slot (wraps around to last slot from slot 0).
+
+```java
+public void prevPath()
+```
+
+**Behavior:** Uses modulo arithmetic to cycle backwards through `Constants.NUM_PATHS` slots.
+
+### getCurrentPathIndex
+
+Returns the current path slot index.
+
+```java
+public int getCurrentPathIndex()
+```
+
+<ResponseField name="return" type="int">
+  Zero-based index of current path slot (0 to NUM_PATHS-1)
+</ResponseField>
+
+## Utility Methods
+
+### getSampleCount
+
+Returns the number of samples in the current path slot.
+
+```java
+public int getSampleCount()
+```
+
+<ResponseField name="return" type="int">
+  Number of recorded samples in current path
+</ResponseField>
+
+### getReplayIndex
+
+Returns the current position in the replay sequence.
+
+```java
+public int getReplayIndex()
+```
+
+<ResponseField name="return" type="int">
+  Current sample index being replayed
+</ResponseField>
+
+### checkStall
+
+Internal method that checks if the robot is stalled during replay.
+
+```java
+private boolean checkStall(double currentLeft, double currentRight)
+```
+
+<ParamField path="currentLeft" type="double">
+  Current left encoder distance
+</ParamField>
+
+<ParamField path="currentRight" type="double">
+  Current right encoder distance
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  `true` if stall detected (encoders haven't moved for STALL_CHECK_CYCLES cycles), `false` otherwise
+</ResponseField>
+
+**Behavior:** 
+- Compares current encoder values with previous cycle
+- Increments counter if movement is below `STALL_THRESHOLD` (0.5)
+- Resets counter if movement detected
+- Returns true after `Constants.STALL_CHECK_CYCLES` consecutive stalled cycles
+
+## Constants Used
+
+- `Constants.NUM_PATHS` - Total number of path slots available
+- `Constants.STALL_CHECK_CYCLES` - Number of consecutive stalled cycles before stopping replay
+- `STALL_THRESHOLD` - Minimum encoder distance change (0.5) to consider movement

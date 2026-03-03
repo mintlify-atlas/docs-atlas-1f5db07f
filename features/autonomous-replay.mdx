@@ -1,0 +1,269 @@
+---
+title: Autonomous Replay
+description: Playing back recorded paths with stall detection
+---
+
+The autonomous replay system executes previously recorded paths by playing back motor commands in real-time. It includes intelligent stall detection to safely stop if the robot becomes stuck.
+
+## Starting Replay
+
+Press the **Y button** to replay the current path slot:
+
+```java Teleop.java:42-48
+if (oi.getDriveYButton()) {
+    if (driveTrain.isReplaying()) {
+        driveTrain.stopReplay();
+    } else if (!driveTrain.isRecording()) {
+        driveTrain.startReplay();
+    }
+}
+```
+
+<Warning>
+You cannot start replay while recording. The system will ignore the button press if recording is active.
+</Warning>
+
+### Initialization
+
+The `startReplay()` method validates the path and initializes replay state:
+
+```java DriveTrain.java:139-146
+public void startReplay() {
+    if (!pathRecorder.hasRecordedPath()) {
+        System.out.println("[PathRecorder] Nothing recorded on path " 
+            + (pathRecorder.getCurrentPathIndex() + 1) 
+            + " - cannot replay.");
+        return;
+    }
+    pathRecorder.startReplay(getLeftEncoderDistance(), getRightEncoderDistance());
+    System.out.println("[PathRecorder] Replay started on path " 
+        + (pathRecorder.getCurrentPathIndex() + 1) 
+        + " (" + pathRecorder.getSampleCount() + " samples).");
+}
+```
+
+In PathRecorder:
+
+```java PathRecorder.java:85-92
+public void startReplay(double currentLeft, double currentRight) {
+    if (currentSamples().isEmpty()) return;
+    replaying = true;
+    replayIndex = 0;
+    stallPrevLeft  = currentLeft;
+    stallPrevRight = currentRight;
+    stallCounter   = 0;
+}
+```
+
+<Info>
+The current encoder positions are captured at replay start to establish a baseline for stall detection.
+</Info>
+
+## Replay Execution
+
+### Step-by-Step Playback
+
+During replay, the `replayStep()` method is called every 20ms cycle:
+
+```java Teleop.java:50-52
+if (driveTrain.isReplaying()) {
+    driveTrain.replayStep();
+}
+```
+
+The DriveTrain wrapper:
+
+```java DriveTrain.java:157-167
+public boolean replayStep() {
+    double[] powers = pathRecorder.replayStep(
+            getLeftEncoderDistance(), getRightEncoderDistance());
+    if (powers == null) {
+        driveTank(0, 0);
+        System.out.println("[PathRecorder] Replay finished on path " 
+            + (pathRecorder.getCurrentPathIndex() + 1) + ".");
+        return false;
+    }
+    driveTank(powers[0], powers[1]);
+    return true;
+}
+```
+
+### Core Replay Logic
+
+The PathRecorder's `replayStep()` method handles the playback:
+
+```java PathRecorder.java:130-149
+public double[] replayStep(double currentLeft, double currentRight) {
+    if (!replaying || replayIndex >= currentSamples().size()) {
+        replaying = false;
+        return null;
+    }
+
+    // Stall check: if the robot is trying to drive but the encoders
+    // haven't changed, stop and return null.
+    if (replayIndex > 0 && checkStall(currentLeft, currentRight)) {
+        System.out.println("[PathRecorder] STALL DETECTED on path " 
+            + (currentPathIndex + 1)
+            + " at sample " + replayIndex + " - stopping replay.");
+        replaying = false;
+        return null;
+    }
+
+    Sample s = currentSamples().get(replayIndex);
+    replayIndex++;
+
+    return new double[] { s.leftPower, s.rightPower };
+}
+```
+
+<Note>
+Returning `null` signals that replay is complete or should stop. The DriveTrain then sets motors to zero.
+</Note>
+
+## Stall Detection
+
+Stall detection prevents the robot from continuously trying to drive when stuck against an obstacle.
+
+### How It Works
+
+The system monitors encoder movement during replay:
+
+```java PathRecorder.java:110-124
+private boolean checkStall(double currentLeft, double currentRight) {
+    double leftDelta  = Math.abs(currentLeft  - stallPrevLeft);
+    double rightDelta = Math.abs(currentRight - stallPrevRight);
+
+    stallPrevLeft  = currentLeft;
+    stallPrevRight = currentRight;
+
+    if (leftDelta < STALL_THRESHOLD && rightDelta < STALL_THRESHOLD) {
+        stallCounter++;
+    } else {
+        stallCounter = 0;
+    }
+
+    return stallCounter >= Constants.STALL_CHECK_CYCLES;
+}
+```
+
+### Stall Thresholds
+
+```java PathRecorder.java:33-36
+private double stallPrevLeft;
+private double stallPrevRight;
+private int    stallCounter;
+private static final double STALL_THRESHOLD = 0.5;
+```
+
+**Parameters:**
+- **STALL_THRESHOLD**: Minimum encoder distance change required (0.5 units)
+- **STALL_CHECK_CYCLES**: Number of consecutive cycles below threshold before declaring a stall (configured in Constants)
+
+<Info>
+**Example**: If `STALL_CHECK_CYCLES = 25`, the robot must be stuck for 25 cycles (500ms) before replay stops.
+</Info>
+
+### Stall Detection Logic
+
+<Steps>
+  <Step title="Measure encoder movement">
+    Calculate the absolute distance change for left and right encoders since the last cycle
+  </Step>
+  
+  <Step title="Compare to threshold">
+    If both deltas are below `STALL_THRESHOLD` (0.5 units), increment the stall counter
+  </Step>
+  
+  <Step title="Reset on movement">
+    If either encoder moves sufficiently, reset `stallCounter` to 0
+  </Step>
+  
+  <Step title="Declare stall">
+    If `stallCounter` reaches `STALL_CHECK_CYCLES`, return true and stop replay
+  </Step>
+</Steps>
+
+<Warning>
+Stall detection only runs during replay (`replayIndex > 0`). The first sample is always executed without checking.
+</Warning>
+
+## Real-Time Playback
+
+The replay system maintains the original timing:
+
+- **Recording**: Samples captured every 20ms
+- **Playback**: One sample executed per 20ms cycle
+- **Duration**: A 10-second recording takes 10 seconds to replay
+
+This ensures the robot follows the same speed and timing as the original manual drive.
+
+## Stopping Replay
+
+### Manual Stop
+
+Press **Y button** again to stop replay early:
+
+```java DriveTrain.java:148-151
+public void stopReplay() {
+    pathRecorder.stopReplay();
+    driveTank(0, 0);
+}
+```
+
+### Automatic Stop
+
+Replay stops automatically when:
+
+1. **All samples completed**: `replayIndex >= currentSamples().size()`
+2. **Stall detected**: Encoders haven't moved for `STALL_CHECK_CYCLES` cycles
+3. **Manual interruption**: Y button pressed during replay
+
+## Replay State Tracking
+
+You can query replay status:
+
+```java PathRecorder.java:98-100
+public boolean isReplaying() {
+    return replaying;
+}
+```
+
+And get the current replay position:
+
+```java PathRecorder.java:155-157
+public int getReplayIndex() {
+    return replayIndex;
+}
+```
+
+## Usage in Autonomous Mode
+
+During competition, recorded paths can be selected and replayed in autonomous mode:
+
+<Steps>
+  <Step title="Before the match">
+    Record paths during practice using teleop controls
+  </Step>
+  
+  <Step title="Select path slot">
+    Use bumpers to choose the desired path (1-5) before the match starts
+  </Step>
+  
+  <Step title="Autonomous period">
+    Call `driveTrain.startReplay()` at the start of autonomous
+  </Step>
+  
+  <Step title="Execute replay">
+    Call `driveTrain.replayStep()` in the autonomous periodic loop
+  </Step>
+</Steps>
+
+## Integration with Drive Modes
+
+Replay uses **tank drive** for precise motor control:
+
+```java DriveTrain.java:165
+driveTank(powers[0], powers[1]);
+```
+
+This ensures the exact recorded motor powers are applied, regardless of which drive mode was used during recording. See [Drive Modes](/features/drive-modes) for more details on tank drive.

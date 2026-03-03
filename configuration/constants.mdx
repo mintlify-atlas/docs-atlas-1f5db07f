@@ -1,0 +1,94 @@
+---
+title: 'Robot Constants'
+description: 'Core configuration constants for the Agrobotics FRC robot'
+---
+
+This page documents all constant values used throughout the robot codebase. These values are defined in `Constants.java` and control fundamental robot behavior.
+
+## Robot Identification
+
+<ParamField path="TITAN_ID" type="int" default="42">
+  Unique identifier for the Titan robot on the CAN bus network
+</ParamField>
+
+## Motor Port Assignments
+
+<ParamField path="LEFT_FRONT" type="int" default="0">
+  CAN ID for the left front drive motor
+</ParamField>
+
+<ParamField path="LEFT_BACK" type="int" default="1">
+  CAN ID for the left back drive motor
+</ParamField>
+
+<ParamField path="RIGHT_FRONT" type="int" default="2">
+  CAN ID for the right front drive motor
+</ParamField>
+
+<ParamField path="RIGHT_BACK" type="int" default="3">
+  CAN ID for the right back drive motor
+</ParamField>
+
+## Sensor Configuration
+
+<ParamField path="NAVX_PORT" type="SPI.Port" default="SPI.Port.kMXP">
+  SPI port for the NavX gyroscope sensor, using the MXP port on the RoboRIO
+</ParamField>
+
+## Control Parameters
+
+<ParamField path="DEADZONE" type="double" default="0.06">
+  Joystick deadzone threshold to prevent drift from minor input variations
+</ParamField>
+
+<ParamField path="STALL_CHECK_CYCLES" type="int" default="25">
+  Number of cycles to check for motor stall conditions
+</ParamField>
+
+## Autonomous Configuration
+
+<ParamField path="NUM_PATHS" type="int" default="5">
+  Maximum number of autonomous paths that can be stored
+</ParamField>
+
+<ParamField path="REPLAY_SPEED" type="double" default="0.5">
+  Speed multiplier for path replay during autonomous mode (50% of recorded speed)
+</ParamField>
+
+## Wheel and Encoder Parameters
+
+<ParamField path="wheelRadius" type="double" default="62.5">
+  Radius of the drive wheels in millimeters
+</ParamField>
+
+<ParamField path="pulsePerRevolution" type="double" default="1464">
+  Number of encoder pulses per complete wheel revolution
+</ParamField>
+
+<ParamField path="gearRatio" type="double" default="1.0">
+  Gear ratio between the motor and wheel (1:1 direct drive)
+</ParamField>
+
+<ParamField path="encoderPulseRatio" type="double" default="1464">
+  Total encoder pulses per wheel revolution, calculated as `pulsePerRevolution * gearRatio`
+</ParamField>
+
+## Distance Calculation
+
+<ParamField path="DIST_PER_TICK" type="double" default="0.2685">
+  Distance traveled per encoder tick in millimeters
+</ParamField>
+
+The `DIST_PER_TICK` value is calculated using the formula:
+
+```java
+DIST_PER_TICK = (Math.PI * 2 * wheelRadius) / encoderPulseRatio
+```
+
+This converts encoder ticks to actual distance traveled:
+- Wheel circumference: `2 * π * 62.5 = 392.7mm`
+- Distance per tick: `392.7 / 1464 ≈ 0.2685mm`
+
+<Note>
+  The distance calculation assumes no wheel slippage and accounts for the gear ratio between the motor encoder and the wheel.
+</Note>
