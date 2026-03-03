@@ -1,0 +1,120 @@
+{
+  "projectType": "framework",
+  "projectName": "Agrobotics",
+  "projectDescription": "FRC robot control system with path recording, autonomous replay, and multi-mode drive capabilities",
+  "theme": "aspen",
+  "primaryColor": "#2E7D32",
+  "lightColor": "#66BB6A",
+  "darkColor": "#1B5E20",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "setup"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "architecture/overview",
+              "architecture/robot-lifecycle",
+              "architecture/command-pattern"
+            ]
+          },
+          {
+            "group": "Subsystems",
+            "pages": [
+              "subsystems/drivetrain",
+              "subsystems/encoders",
+              "subsystems/navx"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/drive-modes",
+              "features/path-recording",
+              "features/autonomous-replay",
+              "features/gamepad-controls"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/constants",
+              "configuration/motor-mapping",
+              "configuration/gamepad-mapping"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Subsystems",
+            "pages": [
+              "api/drivetrain",
+              "api/path-recorder"
+            ]
+          },
+          {
+            "group": "Commands",
+            "pages": [
+              "api/teleop"
+            ]
+          },
+          {
+            "group": "Input",
+            "pages": [
+              "api/oi",
+              "api/gamepad-constants"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "api/constants"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Multi-mode drive control (arcade and tank)",
+    "Path recording and autonomous replay system",
+    "NavX gyroscope integration for precise navigation",
+    "Multiple path slot management (5 concurrent paths)",
+    "Stall detection during autonomous replay",
+    "Encoder-based odometry tracking",
+    "Configurable gamepad controls"
+  ],
+  "publicApiSurface": [
+    "DriveTrain.driveArcade(x, y)",
+    "DriveTrain.driveTank(left, right)",
+    "DriveTrain.toggleRecording()",
+    "DriveTrain.startReplay()",
+    "DriveTrain.stopReplay()",
+    "DriveTrain.nextPath()",
+    "DriveTrain.prevPath()",
+    "DriveTrain.resetEncoders()",
+    "DriveTrain.resetGyro()",
+    "PathRecorder.startRecording()",
+    "PathRecorder.stopRecording()",
+    "PathRecorder.sample(leftPower, rightPower)",
+    "PathRecorder.startReplay(currentLeft, currentRight)",
+    "PathRecorder.replayStep(currentLeft, currentRight)",
+    "OI.getLeftDriveX()",
+    "OI.getLeftDriveY()",
+    "OI.getDriveXButton()",
+    "OI.getDriveYButton()",
+    "Teleop command (default drivetrain control)"
+  ]
+}
